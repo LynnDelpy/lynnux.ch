@@ -61,9 +61,9 @@
     out.html(t(0.160522) + 'loaded ' + LX.cases.total() + ' cases into ~/cases, guest session for ' + span('c-amber', 'analyst') + ' opened');
     await wait(220);
     out.text('');
-    // like any self respecting arch install, the shell runs fastfetch on start
-    LX.term.echo('fastfetch');
-    LX.cmds.fastfetch.fn({ args: [], stdin: null, out: out, piped: false });
+    // ~/.zshrc ends with hyfetch, so every shell starts with pride
+    LX.term.echo('hyfetch');
+    LX.cmds.hyfetch.fn({ args: [], stdin: null, out: out, piped: false });
     out.text('');
     out.html('welcome, analyst. this is ' + span('c-amber', LX_CONFIG.handle) + "'s forensic workstation." + span('c-dim', '  ' + LX_CONFIG.tagline + ' · ' + LX_CONFIG.location));
     out.text('');

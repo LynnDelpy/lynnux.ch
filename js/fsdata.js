@@ -22,7 +22,7 @@ LX.oldHistory = [
   'wc -c about.txt',
   '# why is about.txt so much bigger than what cat shows me',
   'xxd about.txt | head -20',
-  'history -c   # oops, that only clears the session, not the file'
+  '# note to self: setopt HIST_IGNORE_SPACE. start a command with a space and it never lands in here'
 ];
 
 LX.buildFS = function () {
@@ -73,8 +73,40 @@ LX.buildFS = function () {
     cases: D(cases, { ro: true }),
     writeups: D(wu),
     work: D({ 'README': F('scratch space. tools write their output here when the cwd is read-only.\n') }),
-    '.bash_history': { t: 'f', get text() { return LX.oldHistory.concat(LX.hist).join('\n') + '\n'; } },
-    '.lxshrc': F("# ~/.lxshrc\nexport PS1='\\u@\\h:\\w$ '\nalias ll='ls -la'\nalias please='sudo'\n\n# evidence is read-only. always.\nset -o noclobber\n")
+    // zsh EXTENDED_HISTORY format, ": <epoch>:<duration>;<command>". a timeline for free
+    '.zsh_history': { t: 'f', get text() {
+      var old = LX.oldHistory.map(function (c, i) { return ': ' + (1754035980 + i * 47) + ':0;' + c; });
+      var now = LX.hist.map(function (c, i) { return ': ' + Math.floor(LX.histTimes[i] / 1000) + ':0;' + c; });
+      return old.concat(now).join('\n') + '\n';
+    } },
+    '.zshrc': F([
+      '# ~/.zshrc, provisioned by ' + C.handle + ' for guest analysts',
+      'HISTFILE=~/.zsh_history',
+      'HISTSIZE=100000',
+      'SAVEHIST=100000',
+      'setopt EXTENDED_HISTORY INC_APPEND_HISTORY HIST_IGNORE_SPACE',
+      '# yes, even guest history is evidence',
+      '',
+      'source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh',
+      'source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh',
+      '',
+      "PROMPT='%F{214}%n@%m%f %F{cyan}%~%f %(?.%F{green}.%F{red})❯%f '",
+      '',
+      "alias ll='ls -la'",
+      "alias please='sudo'",
+      '',
+      '# every shell starts with pride',
+      'hyfetch',
+      ''
+    ].join('\n')),
+    '.config': D({
+      'hyfetch.json': F(JSON.stringify({
+        preset: 'lesbian', mode: 'rgb', light_dark: 'dark', lightness: 0.65,
+        color_align: { mode: 'horizontal', custom_colors: [], fore_back: null },
+        backend: 'fastfetch', args: null, distro: null, pride_month_shown: [], pride_month_disable: false
+      }, null, 2) + '\n'),
+      fastfetch: D({ 'config.jsonc': F('// fastfetch does the fetching, hyfetch does the colours\n{\n  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",\n  "logo": { "type": "builtin", "source": "arch" },\n  "display": { "separator": ": ", "bar": { "char": { "elapsed": "■", "total": "■" }, "width": 10 } },\n  "modules": ["title", "separator", "os", "host", "kernel", "uptime", "packages", "shell", "de", "wm", "theme", "terminal", "cpu", "gpu", "memory", "swap", "disk", "battery", "colors"]\n}\n') })
+    })
   });
 
   var cpu = C.machine.cpu || 'unknown';
@@ -93,9 +125,10 @@ LX.buildFS = function () {
     }),
     etc: D({
       hostname: F('lynnux\n'),
+      shells: F('# Pathnames of valid login shells.\n/bin/sh\n/bin/bash\n/usr/bin/bash\n/bin/zsh\n/usr/bin/zsh\n'),
       motd: F('welcome to lynnux. this is a forensic workstation.\nwrite-blocker is ON. evidence stays untouched. have fun.\n'),
       'os-release': F('NAME="Arch Linux"\nPRETTY_NAME="Arch Linux"\nID=arch\nBUILD_ID=rolling\nVARIANT="lynnux forensic workstation"\nANSI_COLOR="38;2;23;147;209"\nHOME_URL="https://archlinux.org/"\nLOGO=archlinux-logo\n'),
-      passwd: F('root:x:0:0:root:/root:/bin/bash\n' + C.handle + ':x:1000:1000:' + C.handle + ':/home/' + C.handle + ':/bin/zsh\nanalyst:x:1001:1001:guest analyst:/home/analyst:/bin/lxsh\nsuspect_47:x:4747:4747:do not trust:/nonexistent:/usr/sbin/nologin\n'),
+      passwd: F('root:x:0:0:root:/root:/bin/bash\n' + C.handle + ':x:1000:1000:' + C.handle + ':/home/' + C.handle + ':/usr/bin/zsh\nanalyst:x:1001:1001:guest analyst:/home/analyst:/usr/bin/zsh\nsuspect_47:x:4747:4747:do not trust:/nonexistent:/usr/sbin/nologin\n'),
       shadow: F('', { denied: true }),
       'hosts': F('127.0.0.1  localhost\n127.0.1.1  lynnux\n# 198.51.100.23  update.telemetry-cdn.example   <- blocked after case LX-004\n')
     }),

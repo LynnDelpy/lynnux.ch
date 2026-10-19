@@ -83,7 +83,7 @@ var LX_CASES = [
       'look closer at what you have already read.'
     ],
     hints: [
-      'cat shows you characters. xxd shows you bytes. sometimes they disagree. also: whose shell history is ~/.bash_history?',
+      'cat shows you characters. xxd shows you bytes. sometimes they disagree. also: read the old entries in ~/.zsh_history.',
       'about.txt is bigger than it looks. e2 80 8b and e2 80 8c are zero width characters. call them 0 and 1.'
     ]
   }

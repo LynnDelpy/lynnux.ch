@@ -405,9 +405,24 @@
 
   // ------------------------------------------------------------ system
   def('clear', { cat: 'system', help: 'clear the screen (ctrl+l)' }, function () { LX.ui.out.textContent = ''; });
-  def('history', { cat: 'system', help: 'your shell history. it is evidence too.', usage: 'history [-c]' }, function (ctx) {
-    if (ctx.args[0] === '-c') { LX.hist.length = 0; LX.histIdx = 0; return; }
-    LX.hist.forEach(function (h, i) { ctx.out.html(span('c-dim', LX.pad(i + 1, 5, true) + '  ') + esc(h)); });
+  def('history', { cat: 'system', help: 'your shell history. it is evidence too. -i adds timestamps', usage: 'history [-i] [-c]' }, function (ctx) {
+    if (ctx.args[0] === '-c') { LX.hist.length = 0; LX.histTimes.length = 0; LX.histIdx = 0; return; }
+    var stamps = ctx.args[0] === '-i' || ctx.args[0] === '-E' || ctx.args[0] === '-f';
+    LX.hist.forEach(function (h, i) {
+      var t = stamps ? new Date(LX.histTimes[i]).toISOString().replace('T', ' ').slice(0, 16) + '  ' : '';
+      if (ctx.piped) ctx.out.text(LX.pad(i + 1, 5, true) + '  ' + t + h);
+      else ctx.out.html(span('c-dim', LX.pad(i + 1, 5, true) + '  ' + t) + LX.highlight(h));
+    });
+  });
+  def('bash', { cat: 'system', hidden: true }, function (ctx) {
+    ctx.out.html(span('c-dim', 'you are already home. this is ') + span('c-green', 'zsh') + span('c-dim', '. bash is for scripts and nostalgia.'));
+  });
+  LX.cmds.sh = LX.cmds.bash;
+  def('chsh', { cat: 'system', hidden: true }, function (ctx) {
+    ctx.out.html(span('c-dim', 'chsh: the shell is zsh. that is not up for debate. (also, guests cannot change shells)'));
+  });
+  def('fish', { cat: 'system', hidden: true }, function (ctx) {
+    ctx.out.html(span('c-dim', 'zsh: command not found: fish ') + span('c-faint', '(the autosuggestions here were stolen from it anyway)'));
   });
   def('whoami', { cat: 'system', help: 'who are you' }, function (ctx) { ctx.out.text(LX.USER); });
   def('id', { cat: 'system', help: 'user identity' }, function (ctx) { ctx.out.text('uid=1001(analyst) gid=1001(analyst) groups=1001(analyst),4747(evidence-ro)'); });
@@ -421,7 +436,7 @@
     ctx.out.text(' ' + new Date().toTimeString().slice(0, 8) + ' up ' + Math.floor(s / 60) + ' min, 1 user (you), load average: 0.47, 0.13, 0.04');
   });
   def('env', { cat: 'system', help: 'environment variables' }, function (ctx) {
-    ctx.out.text(['HOME=' + LX.HOME, 'USER=' + LX.USER, 'SHELL=/bin/lxsh', 'PWD=' + LX.fs.cwd, 'HOSTNAME=lynnux', 'WRITE_BLOCKER=on', 'EDITOR=vim', 'TERM=xterm-256color'].join('\n'));
+    ctx.out.text(['HOME=' + LX.HOME, 'USER=' + LX.USER, 'SHELL=/usr/bin/zsh', 'ZSH_VERSION=5.9', 'PWD=' + LX.fs.cwd, 'HOSTNAME=lynnux', 'WRITE_BLOCKER=on', 'EDITOR=vim', 'TERM=xterm-256color'].join('\n'));
   });
   def('alias', { cat: 'system', help: 'list or set aliases', usage: "alias [name='command']" }, function (ctx) {
     if (!ctx.args.length) { Object.keys(LX.aliases).sort().forEach(function (k) { ctx.out.text('alias ' + k + "='" + LX.aliases[k] + "'"); }); return; }

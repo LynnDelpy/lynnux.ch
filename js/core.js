@@ -7,6 +7,7 @@ var LX = {
   cmds: Object.create(null),
   aliases: { ll: 'ls -la', la: 'ls -a', l: 'ls', '..': 'cd ..', cls: 'clear', please: 'sudo' },
   hist: [],
+  histTimes: [],
   status: 0,
   keys: [],
   HOME: '/home/analyst',
@@ -243,16 +244,16 @@ LX.parse = function (line) {
   function endSeg() { push(); if (argv.length) pipe.push(argv); argv = []; }
   function endPipe(next) {
     endSeg();
-    if (want) throw new Error("syntax error near unexpected token 'newline'");
+    if (want) throw new Error("parse error near `\\n'");
     if (pipe.length) chain.push({ op: op, pipe: pipe, redir: redir, quietErr: quietErr });
-    else if (next) throw new Error("syntax error near unexpected token '" + next + "'");
+    else if (next) throw new Error('parse error near `' + next + "'");
     pipe = []; redir = null; quietErr = false; op = next;
   }
   while (i < line.length) {
     var ch = line[i], nx = line[i + 1];
     if (ch === "'") {
       var j = line.indexOf("'", i + 1);
-      if (j < 0) throw new Error('unexpected EOF while looking for matching quote');
+      if (j < 0) throw new Error("unmatched '");
       cur = (cur || '') + line.slice(i + 1, j); i = j + 1; continue;
     }
     if (ch === '"') {
@@ -262,13 +263,13 @@ LX.parse = function (line) {
         else if (line[i] === '$') { var m = /^\$(\w+|\?)/.exec(line.slice(i)); if (m) { s += vars(m[1]); i += m[0].length; } else s += line[i++]; }
         else s += line[i++];
       }
-      if (i >= line.length) throw new Error('unexpected EOF while looking for matching quote');
+      if (i >= line.length) throw new Error('unmatched "');
       i++; cur = (cur || '') + s; continue;
     }
     if (ch === '\\' && i + 1 < line.length) { cur = (cur || '') + nx; i += 2; continue; }
     if (/\s/.test(ch)) { push(); i++; continue; }
     if (ch === '|' && nx === '|') { endPipe('||'); i += 2; continue; }
-    if (ch === '|') { endSeg(); if (!pipe.length) throw new Error("syntax error near unexpected token '|'"); i++; continue; }
+    if (ch === '|') { endSeg(); if (!pipe.length) throw new Error("parse error near `|'"); i++; continue; }
     if (ch === '&' && nx === '&') { endPipe('&&'); i += 2; continue; }
     if (ch === ';') { endPipe(';'); i++; continue; }
     if (ch === '2' && nx === '>' && cur === null) {
@@ -285,9 +286,57 @@ LX.parse = function (line) {
   return chain;
 };
 
+// zsh-syntax-highlighting, more or less: commands green when they exist and red when they
+// don't, strings amber, operators violet, existing paths underlined. never changes the text,
+// so the coloured mirror lines up with the real input exactly
+LX.highlight = function (v) {
+  var out = '', i = 0, cmdPos = true, sp = LX.span, esc = LX.esc;
+  while (i < v.length) {
+    var ch = v[i], rest = v.slice(i);
+    if (/\s/.test(ch)) { out += esc(ch); i++; continue; }
+    if (ch === '#' && (i === 0 || /\s/.test(v[i - 1]))) { out += sp('c-dim', rest); break; }
+    var op = /^(\|\||&&|\||;|>>|>|2>&1|2>)/.exec(rest);
+    if (op && (op[0][0] !== '2' || i === 0 || /\s/.test(v[i - 1]))) {
+      out += sp('c-violet', op[0]); i += op[0].length;
+      if (/^(\|\||&&|\||;)$/.test(op[0])) cmdPos = true;
+      continue;
+    }
+    var j = i, plain = '', html = '', seg = '', quoted = false;
+    while (j < v.length && !/[\s|;&>]/.test(v[j])) {
+      if (v[j] === '"' || v[j] === "'") {
+        var k = v.indexOf(v[j], j + 1);
+        if (k < 0) k = v.length - 1;
+        html += esc(seg) + sp('c-amber', v.slice(j, k + 1)); seg = '';
+        plain += v.slice(j + 1, k); j = k + 1; quoted = true; continue;
+      }
+      if (v[j] === '\\' && j + 1 < v.length) { seg += v.slice(j, j + 2); plain += v[j + 1]; j += 2; continue; }
+      seg += v[j]; plain += v[j]; j++;
+    }
+    if (j === i) { out += esc(ch); i++; continue; } // a lone & or similar
+    var word = v.slice(i, j);
+    if (cmdPos) { out += sp(LX.cmds[plain] || LX.aliases[plain] ? 'c-green' : 'c-red', word); cmdPos = false; }
+    else if (!quoted && plain[0] !== '-' && plain.indexOf('$') < 0 && LX.fs.get(LX.fs.norm(plain))) out += sp('ul', word);
+    else out += html + esc(seg);
+    i = j;
+  }
+  return out;
+};
+
+// zsh-autosuggestions, history strategy: newest matching command wins
+LX.suggest = function (v) {
+  var pools = [LX.hist, LX.oldHistory || []];
+  for (var p = 0; p < pools.length; p++) {
+    for (var i = pools[p].length - 1; i >= 0; i--) {
+      var h = pools[p][i];
+      if (h.length > v.length && h.indexOf(v) === 0 && h[0] !== '#') return h;
+    }
+  }
+  return '';
+};
+
 LX.expandVars = function (s) {
   return s.replace(/\u0001(\w+|\?)\u0002/g, function (m, name) {
-    var env = { HOME: LX.HOME, USER: LX.USER, PWD: LX.fs.cwd, HOSTNAME: 'lynnux', SHELL: '/bin/lxsh', '?': String(LX.status), RANDOM: String(Math.floor(Math.random() * 32768)) };
+    var env = { HOME: LX.HOME, USER: LX.USER, PWD: LX.fs.cwd, HOSTNAME: 'lynnux', SHELL: '/usr/bin/zsh', '0': 'zsh', ZSH_VERSION: '5.9', '?': String(LX.status), RANDOM: String(Math.floor(Math.random() * 32768)) };
     return name in env ? env[name] : '';
   });
 };
@@ -341,10 +390,12 @@ LX.run = async function (line, opts) {
   line = line.replace(/\s+$/, '');
   if (!opts.silent) LX.term.echo(line);
   if (!line.trim()) return;
-  if (!opts.noHist) { LX.hist.push(line); LX.histIdx = LX.hist.length; }
+  // setopt HIST_IGNORE_SPACE: a leading space keeps a command out of the history
+  if (!opts.noHist && line[0] !== ' ') { LX.hist.push(line); LX.histTimes.push(Date.now()); }
+  LX.histIdx = LX.hist.length;
   if (line.trim()[0] === '#') return;
   var chain;
-  try { chain = LX.parse(line); } catch (e) { LX.term.err('lxsh: ' + e.message); LX.status = 2; return; }
+  try { chain = LX.parse(line); } catch (e) { LX.term.err('zsh: ' + e.message); LX.status = 1; LX.ui.updatePrompt(); return; }
   var ctl = new AbortController();
   LX.running = ctl;
   LX.ui.busy(true);
@@ -377,7 +428,7 @@ LX.runPipe = async function (c, signal) {
     out = capture ? new CapOut(c.quietErr) : (c.quietErr ? new QuietErr(LX.term) : LX.term);
     var cmd = LX.cmds[name];
     if (!cmd) {
-      LX.term.err(name + ': command not found');
+      LX.term.err('zsh: command not found: ' + name);
       var near = Object.keys(LX.cmds).filter(function (k) { return !LX.cmds[k].hidden && LX.lev(k, name) <= 1; });
       if (near.length && near.length < 4) LX.term.text('did you mean: ' + near.join(', ') + '?', 'c-dim');
       status = 127; stdin = ''; stdinBytes = null; out = null; continue;
@@ -414,7 +465,7 @@ LX.runPipe = async function (c, signal) {
         if (!LX.fs.writable(abs.slice(0, abs.lastIndexOf('/')) || '/')) throw new Error('write-blocker: read-only');
         ex.text += stdin;
       } else LX.fs.put(abs, LX.F(stdin || ''));
-    } catch (e) { LX.term.err('lxsh: ' + e.message); return 1; }
+    } catch (e) { LX.term.err('zsh: ' + e.message); return 1; }
   }
   return status;
 };
@@ -431,10 +482,19 @@ LX.lev = function (a, b) {
 
 // ---------------------------------------------------------------- ui
 LX.ui = {
-  out: LX.$('out'), input: LX.$('in'), pl: LX.$('pl'), ps1: LX.$('ps1'),
+  out: LX.$('out'), input: LX.$('in'), hl: LX.$('in-hl'), pl: LX.$('pl'), ps1: LX.$('ps1'),
+  suggestion: '',
+  // PROMPT='%F{214}%n@%m%f %F{cyan}%~%f %(?.%F{green}.%F{red})❯%f '
   promptHTML: function () {
-    return '<span class="u">' + LX.USER + '</span><span class="at">@</span><span class="h">lynnux</span><span class="at">:</span>' +
-      '<span class="p">' + LX.esc(LX.fs.display(LX.fs.cwd)) + '</span><span class="at">$ </span>';
+    return '<span class="u">' + LX.USER + '</span><span class="at">@</span><span class="h">lynnux</span> ' +
+      '<span class="p">' + LX.esc(LX.fs.display(LX.fs.cwd)) + '</span> <span class="' + (LX.status ? 'c-red' : 'c-green') + '">❯</span> ';
+  },
+  // repaint the highlighted mirror behind the input, plus the grey autosuggestion
+  renderInput: function () {
+    var ui = LX.ui, v = ui.input.value;
+    ui.suggestion = v && ui.input.selectionStart === v.length ? LX.suggest(v) : '';
+    ui.hl.innerHTML = LX.highlight(v) + (ui.suggestion ? LX.span('c-dim', ui.suggestion.slice(v.length)) : '');
+    ui.hl.scrollLeft = ui.input.scrollLeft;
   },
   updatePrompt: function () {
     this.ps1.innerHTML = this.promptHTML();
@@ -445,7 +505,7 @@ LX.ui = {
   trim: function () { while (this.out.childElementCount > 2500) this.out.firstElementChild.remove(); },
   busy: function (on) {
     this.pl.classList.toggle('busy', on);
-    if (!on) { this.input.value = ''; this.focus(); this.scroll(); }
+    if (!on) { this.input.value = ''; this.renderInput(); this.focus(); this.scroll(); }
   },
   focus: function () {
     if (LX.keys.length || !LX.$('overlay').hidden) return;
@@ -492,14 +552,16 @@ LX.ui = {
 
 // the default sink: straight into the terminal
 LX.term = new TermOut();
-LX.term.echo = function (line) { this.line(LX.ui.promptHTML() + LX.esc(line)); };
+LX.term.echo = function (line) { this.line(LX.ui.promptHTML() + LX.highlight(line)); };
 
 // ---------------------------------------------------------------- input handling
 LX.histIdx = 0;
 LX.ui.input.addEventListener('keydown', function (e) {
   if (LX.keys.length || LX.running) return;
   var inp = LX.ui.input;
-  if (e.key === 'Enter') { e.preventDefault(); var v = inp.value; inp.value = ''; LX.run(v); }
+  var atEnd = inp.selectionStart === inp.value.length && inp.selectionEnd === inp.value.length;
+  if (e.key === 'Enter') { e.preventDefault(); var v = inp.value; inp.value = ''; LX.ui.renderInput(); LX.run(v); return; }
+  else if ((e.key === 'ArrowRight' || e.key === 'End') && atEnd && LX.ui.suggestion) { e.preventDefault(); inp.value = LX.ui.suggestion; }
   else if (e.key === 'ArrowUp') { e.preventDefault(); if (LX.histIdx > 0) { inp.value = LX.hist[--LX.histIdx]; } }
   else if (e.key === 'ArrowDown') {
     e.preventDefault();
@@ -509,10 +571,16 @@ LX.ui.input.addEventListener('keydown', function (e) {
   else if (e.key === 'Tab') { e.preventDefault(); LX.complete(); }
   else if (e.ctrlKey && (e.key === 'l' || e.key === 'L')) { e.preventDefault(); LX.ui.out.textContent = ''; }
   else if (e.ctrlKey && (e.key === 'c' || e.key === 'C') && !inp.value.slice(inp.selectionStart, inp.selectionEnd)) {
-    e.preventDefault(); LX.term.line(LX.ui.promptHTML() + LX.esc(inp.value) + '<span class="c-dim">^C</span>'); inp.value = '';
+    e.preventDefault(); LX.term.line(LX.ui.promptHTML() + LX.highlight(inp.value) + '<span class="c-dim">^C</span>'); inp.value = '';
   }
   else if (e.ctrlKey && (e.key === 'u' || e.key === 'U')) { e.preventDefault(); inp.value = ''; }
+  // history, completion, caret moves: repaint once the browser has applied the key
+  requestAnimationFrame(LX.ui.renderInput);
 });
+LX.ui.input.addEventListener('input', LX.ui.renderInput);
+LX.ui.input.addEventListener('scroll', function () { LX.ui.hl.scrollLeft = LX.ui.input.scrollLeft; });
+LX.ui.input.addEventListener('click', LX.ui.renderInput);
+LX.ui.input.addEventListener('blur', function () { LX.ui.hl.innerHTML = LX.highlight(LX.ui.input.value); });
 
 document.addEventListener('keydown', function (e) {
   if (LX.keys.length) {

@@ -33,7 +33,7 @@ var LX_CONFIG = {
     'and throw at your own tools. everything you need is on this machine.'
   ],
 
-  // `fastfetch` (the silly stats live in js/fun.js). null = line hidden
+  // `fastfetch` / `hyfetch` (the silly stats live in js/fun.js). null = line hidden
   machine: {
     os: 'Arch Linux x86_64',
     kernel: '6.17.2-arch1-1',
@@ -42,8 +42,10 @@ var LX_CONFIG = {
     gpu: 'Intel Iris Xe Graphics @ 1.30 GHz [Integrated]',
     mem: '15.42 GiB',
     shell: 'zsh 5.9',
-    wm: null,       // TODO e.g. 'Hyprland (Wayland)'
-    terminal: null  // TODO e.g. 'kitty 0.43.1'
+    de: 'KDE Plasma 6.5',            // TODO match `plasmashell --version`
+    wm: 'KWin (Wayland)',
+    theme: 'started as Breeze, long ago [Qt]',
+    terminal: null  // TODO e.g. 'konsole 25.08'
   },
 
   // writeups shown in ~/writeups. [{title, url}]

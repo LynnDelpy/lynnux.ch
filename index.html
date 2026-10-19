@@ -22,7 +22,10 @@
   <div id="out" role="log" aria-live="polite" aria-label="terminal output"></div>
   <div class="prompt-line" id="pl">
     <label for="in" id="ps1"></label>
-    <input type="text" id="in" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="terminal input" enterkeyhint="send">
+    <div class="in-wrap">
+      <div id="in-hl" aria-hidden="true"></div>
+      <input type="text" id="in" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="terminal input" enterkeyhint="send">
+    </div>
   </div>
 </main>
 

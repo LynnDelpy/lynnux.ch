@@ -65,7 +65,9 @@
     return [br + ' on ' + os + (tz ? ' · ' + tz : '') + (navigator.hardwareConcurrency ? ' · ' + navigator.hardwareConcurrency + ' threads' : ''),
       os === 'Windows' ? ' (we can work on that)' : os === 'Linux' ? ' (respect)' : ''];
   }
-  def('fastfetch', { cat: 'fun', help: 'system info, plus some very honest stats' }, function (ctx) {
+  // shared by fastfetch and hyfetch. look = null for plain arch blue,
+  // or { colors: [...], key: '#..', title: '#..' } for a pride flag
+  function fetch(ctx, look) {
     var C = LX_CONFIG, M = C.machine;
     var mins = Math.floor((Date.now() - LX.bootTime) / 60000) + 9;
     var up = 420 + ' days, ' + (6 + Math.floor(mins / 60)) + ' hours, ' + (mins % 60) + ' mins';
@@ -78,7 +80,9 @@
     var rows = [
       ['OS', M.os], ['Host', M.host || C.domain + ' (forensic workstation)'], ['Kernel', 'Linux ' + M.kernel], ['Uptime', up],
       ['Packages', '1337 (pacman), 42 (aur), 0 (snap, never)'], ['Shell', M.shell],
-      M.wm ? ['WM', M.wm] : null, M.terminal ? ['Terminal', M.terminal] : null,
+      M.de ? ['DE', M.de] : null, M.wm ? ['WM', M.wm] : null, M.theme ? ['Theme', M.theme] : null,
+      ['Customized', '100% (0 settings left at default)', bar(100) + span('c-dim', ' 0 settings left at default')],
+      M.terminal ? ['Terminal', M.terminal] : null,
       ['CPU', M.cpu], ['GPU', M.gpu],
       ['Memory', M.mem + ' / ' + M.mem + ' 100% (214 tabs)', M.mem + ' / ' + M.mem + ' ' + bar(100) + span('c-dim', ' 214 tabs')],
       ['Swap', '100%, not great, not terrible', '8.00 GiB ' + bar(100) + span('c-dim', ' not great, not terrible')],
@@ -100,25 +104,95 @@
       return;
     }
     // on phones only the essentials are shown (css hides .ff-x), the rest is for bigger screens
-    var EXTRA = { Host: 1, Shell: 1, WM: 1, Terminal: 1, GPU: 1, Swap: 1, 'Disk (/)': 1, Battery: 1, Hashrate: 1, Carved: 1, Deleted: 1, Sleep: 1, 'Trace (you)': 1 };
-    var info = [[span('c-arch b', LX.USER) + '@' + span('c-arch b', 'lynnux')], [span('c-faint', '─'.repeat(14))]];
+    var EXTRA = { Host: 1, Shell: 1, WM: 1, Theme: 1, Customized: 1, Terminal: 1, GPU: 1, Swap: 1, 'Disk (/)': 1, Battery: 1, Hashrate: 1, Carved: 1, Deleted: 1, Sleep: 1, 'Trace (you)': 1 };
+    var info = [['<span class="t">' + LX.USER + '</span>@<span class="t">lynnux</span>'], [span('c-faint', '─'.repeat(14))]];
     rows.forEach(function (r) {
       if (r === 'forensics') info.push([span('c-faint', '─── ') + span('c-amber', 'forensics') + span('c-faint', ' ' + '─'.repeat(20))]);
-      else info.push([span('c-arch b', r[0]) + ': ' + (r[2] || esc(r[1])), EXTRA[r[0]] ? 'ff-x' : '']);
+      else info.push(['<span class="k">' + esc(r[0]) + '</span>: ' + (r[2] || esc(r[1])), EXTRA[r[0]] ? 'ff-x' : '']);
     });
     info.push(['&nbsp;', 'ff-x']);
     info.push([['c-faint', 'c-red', 'c-green', 'c-amber', 'c-blue', 'c-violet', 'c-cyan', 'c-fg'].map(function (c) { return '<span class="' + c + '">███</span>'; }).join(''), 'ff-x']);
-    var wrap = document.createElement('div'); wrap.className = 'ff';
-    var lg = document.createElement('div'); lg.className = 'ff-logo lg'; lg.textContent = ARCH.join('\n');
-    var sm = document.createElement('div'); sm.className = 'ff-logo sm'; sm.textContent = ARCH_SMALL.join('\n');
+
+    var wrap = document.createElement('div'); wrap.className = 'ff' + (look ? ' pride' : '');
+    [[ARCH, 'lg'], [ARCH_SMALL, 'sm']].forEach(function (lg) {
+      var d = document.createElement('div'); d.className = 'ff-logo ' + lg[1];
+      lg[0].forEach(function (line, i) {
+        var sp = document.createElement('span');
+        sp.textContent = line + (i < lg[0].length - 1 ? '\n' : '');
+        // hyfetch's horizontal alignment: the flag stripes run across the logo, top to bottom
+        if (look) sp.style.color = look.colors[Math.floor(i * look.colors.length / lg[0].length)];
+        d.appendChild(sp);
+      });
+      wrap.appendChild(d);
+    });
     var box = document.createElement('div'); box.className = 'ff-info';
     box.innerHTML = info.map(function (l) { return '<div' + (l[1] ? ' class="' + l[1] + '"' : '') + '>' + l[0] + '</div>'; }).join('');
-    wrap.appendChild(lg); wrap.appendChild(sm); wrap.appendChild(box);
+    if (look) {
+      box.querySelectorAll('.k').forEach(function (e) { e.style.color = look.key; });
+      box.querySelectorAll('.t').forEach(function (e) { e.style.color = look.title; });
+    }
+    wrap.appendChild(box);
     ctx.out.el(wrap);
+  }
+  def('fastfetch', { cat: 'fun', help: 'system info, plus some very honest stats' }, function (ctx) { fetch(ctx, null); });
+
+  // ------------------------------------------------------------ hyfetch
+  // flag colours as hyfetch ships them
+  var PRIDE = {
+    lesbian: ['#D62800', '#FF9B56', '#FFFFFF', '#D462A6', '#A40062'],
+    rainbow: ['#E50000', '#FF8D00', '#FFEE00', '#028121', '#004CFF', '#770088'],
+    transgender: ['#55CDFD', '#F6AAB7', '#FFFFFF', '#F6AAB7', '#55CDFD'],
+    nonbinary: ['#FCF431', '#FCFCFC', '#9D59D2', '#282828'],
+    bisexual: ['#D60270', '#9B4F96', '#0038A8'],
+    pansexual: ['#FF1C8D', '#FFD700', '#1AB3FF'],
+    asexual: ['#000000', '#A4A4A4', '#FFFFFF', '#810081'],
+    aromantic: ['#3BA740', '#A8D47A', '#FFFFFF', '#ABABAB', '#000000'],
+    agender: ['#000000', '#BABABA', '#FFFFFF', '#BAF484', '#FFFFFF', '#BABABA', '#000000'],
+    genderfluid: ['#FE76A2', '#FFFFFF', '#BF12D7', '#000000', '#303CBE'],
+    'gay-men': ['#078D70', '#98E8C1', '#FFFFFF', '#7BADE2', '#3D1A78']
+  };
+  var PRIDE_ALIAS = { trans: 'transgender', enby: 'nonbinary', bi: 'bisexual', pan: 'pansexual', ace: 'asexual', aro: 'aromantic', gay: 'gay-men', mlm: 'gay-men', wlw: 'lesbian', pride: 'rainbow' };
+  // dark terminal: keep the real flag colours, only lift ones too dark to see on black
+  function lift(hex) {
+    var r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn, hh = 0, ss = 0;
+    if (l >= 0.4) return hex;
+    if (d) {
+      ss = d / (1 - Math.abs(2 * l - 1));
+      hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      if (hh < 0) hh += 6;
+    }
+    l = 0.4;
+    var c = (1 - Math.abs(2 * l - 1)) * ss, x = c * (1 - Math.abs((hh % 2) - 1)), m = l - c / 2, rgb;
+    rgb = hh < 1 ? [c, x, 0] : hh < 2 ? [x, c, 0] : hh < 3 ? [0, c, x] : hh < 4 ? [0, x, c] : hh < 5 ? [x, 0, c] : [c, 0, x];
+    return '#' + rgb.map(function (v) { return LX.hex(Math.round((v + m) * 255)); }).join('');
+  }
+  function hyfetchConfig() {
+    try { return JSON.parse(LX.fs.get(LX.HOME + '/.config/hyfetch.json').text); } catch (e) { return {}; }
+  }
+  def('hyfetch', { cat: 'fun', help: 'fastfetch, but with pride. -p <flag> to try another one', usage: 'hyfetch [-p preset]' }, function (ctx) {
+    var name = null;
+    for (var i = 0; i < ctx.args.length; i++) {
+      if (ctx.args[i] === '-p' || ctx.args[i] === '--preset') name = ctx.args[++i];
+      else if (ctx.args[i] === '-h' || ctx.args[i] === '--help') {
+        ctx.out.text('usage: hyfetch [-h] [-p PRESET]\n\nhyfetch, neofetch with pride flags <3 (backend: fastfetch)\n\npresets: ' + Object.keys(PRIDE).join(', ') + '\nshort names: ' + Object.keys(PRIDE_ALIAS).join(', '));
+        return;
+      } else { ctx.out.err("hyfetch: error: unrecognized arguments: " + ctx.args[i]); return 2; }
+    }
+    name = name || hyfetchConfig().preset || 'lesbian';
+    name = PRIDE_ALIAS[name] || name;
+    if (!PRIDE[name]) { ctx.out.err("hyfetch: error: argument -p/--preset: invalid choice: '" + name + "' (choose from " + Object.keys(PRIDE).join(', ') + ')'); return 2; }
+    var cols = PRIDE[name].map(lift);
+    if (new Date().getMonth() === 5 && !ctx.piped) {
+      var hp = document.createElement('div');
+      'happy pride month! <3'.split('').forEach(function (ch, k) { var sp = document.createElement('span'); sp.textContent = ch; sp.style.color = lift(PRIDE.rainbow[k % 6]); hp.appendChild(sp); });
+      ctx.out.el(hp);
+    }
+    fetch(ctx, { colors: cols, key: cols[1], title: cols[0] });
   });
   def('neofetch', { cat: 'fun', hidden: true }, function (ctx) {
-    ctx.out.html(span('c-dim', 'neofetch: upstream archived it in 2024. this is an arch box, we use ') + span('c-arch', 'fastfetch') + span('c-dim', ' now.'));
-    return LX.cmds.fastfetch.fn(ctx);
+    ctx.out.html(span('c-dim', 'neofetch: upstream archived it in 2024. here it is hyfetch, with fastfetch underneath.'));
+    return LX.cmds.hyfetch.fn(ctx);
   });
 
   // ------------------------------------------------------------ fortune
