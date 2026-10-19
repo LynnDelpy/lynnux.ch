@@ -1,0 +1,7 @@
+# never commit these, they contain the plaintext flags
+flags.json
+SOLUTIONS.md
+
+__pycache__/
+.DS_Store
+node_modules/

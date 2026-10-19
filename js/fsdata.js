@@ -1,0 +1,101 @@
+// fsdata.js :: what's on the machine. built at boot from config + cases + generated evidence.
+'use strict';
+
+LX.authlog = [
+  'Jul 31 23:51:02 lynnux sshd[3121]: Failed password for root from 203.0.113.66 port 51122 ssh2',
+  'Jul 31 23:51:04 lynnux sshd[3121]: Failed password for root from 203.0.113.66 port 51122 ssh2',
+  'Jul 31 23:51:09 lynnux sshd[3125]: Invalid user admin from 203.0.113.66 port 51130',
+  'Jul 31 23:52:40 lynnux sshd[3140]: Invalid user suspect_47 from 198.51.100.23 port 40022',
+  'Aug  1 00:00:01 lynnux CRON[3301]: pam_unix(cron:session): session opened for user root',
+  'Aug  1 08:12:55 lynnux sudo:     lynn : TTY=pts/0 ; PWD=/home/lynn ; USER=root ; COMMAND=/usr/bin/dd if=/dev/sdb of=usb.img bs=4M status=progress',
+  'Aug  1 08:13:02 lynnux sudo:     lynn : TTY=pts/0 ; PWD=/home/lynn ; USER=root ; COMMAND=/usr/bin/sha256sum usb.img'
+];
+
+LX.oldHistory = [
+  'cd ~/cases && ls -la',
+  'sha256sum case-005/usb.img',
+  'exiftool case-001/postcard.jpg',
+  'binwalk case-003/lake.jpg',
+  'tcpdump -r case-004/capture.pcap | grep -i telemetry',
+  'cd ~',
+  'cat about.txt',
+  'wc -c about.txt',
+  '# why is about.txt so much bigger than what cat shows me',
+  'xxd about.txt | head -20',
+  'history -c   # oops, that only clears the session, not the file'
+];
+
+LX.buildFS = function () {
+  var C = LX_CONFIG, D = LX.D, F = LX.F;
+  var evDate = new Date(2025, 7, 1, 21, 47);
+
+  // ~/links, only the ones that are set
+  var links = {};
+  var L = C.links || {};
+  Object.keys(L).forEach(function (k) { if (L[k]) links[k] = { t: 'l', url: L[k] }; });
+  if (C.email) links.email = { t: 'l', url: 'mailto:' + C.email, label: C.email };
+  if (C.discord) links.discord = { t: 'l', url: 'discord: ' + C.discord, copy: C.discord };
+
+  // ~/writeups
+  var wu = {};
+  (C.writeups || []).forEach(function (w, i) {
+    wu[(w.title || 'writeup-' + i).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')] = { t: 'l', url: w.url };
+  });
+  wu.README = F((C.writeups || []).length
+    ? 'writeups. `open <name>` to read one.\n'
+    : 'nothing published here yet. the cases in ~/cases are the best preview of\nwhat kind of stuff i like to dig into.\n');
+
+  // ~/cases
+  var cases = { README: F(
+    'evidence locker. every case-xxx folder has a BRIEFING.txt and the evidence.\n\n' +
+    '  cases            overview + your progress\n' +
+    '  cat BRIEFING.txt read the case file\n' +
+    '  hint <case>      when you are stuck\n' +
+    '  submit <flag>    flags look like lynnux{...}\n\n' +
+    'the evidence is write-blocked (read-only). tools that produce files\n' +
+    'drop them into ~/work instead. every file can be downloaded too:\n' +
+    '  download <file>  then use your own tools (exiftool, binwalk, wireshark, ...)\n', { ro: true }) };
+  LX_CASES.forEach(function (cs) {
+    var dir = { 'BRIEFING.txt': F(LX.cases.briefing(cs), { ro: true, mtime: evDate }) };
+    (LX_EVIDENCE.files[cs.id] || []).forEach(function (f) {
+      dir[f.name] = { t: 'b', src: f.path, size: f.size, md5: f.md5, sha256: f.sha256, ro: true, mtime: evDate };
+    });
+    cases['case-' + cs.id] = D(dir, { ro: true });
+  });
+
+  // about.txt, with a little something extra after the first line ;)
+  var about = C.about.slice();
+  about[0] = about[0] + LX_EVIDENCE.zw;
+
+  var home = D({
+    'about.txt': F(about.join('\n') + '\n'),
+    links: D(links),
+    cases: D(cases, { ro: true }),
+    writeups: D(wu),
+    work: D({ 'README': F('scratch space. tools write their output here when the cwd is read-only.\n') }),
+    '.bash_history': { t: 'f', get text() { return LX.oldHistory.concat(LX.hist).join('\n') + '\n'; } },
+    '.lxshrc': F("# ~/.lxshrc\nexport PS1='\\u@\\h:\\w$ '\nalias ll='ls -la'\nalias please='sudo'\n\n# evidence is read-only. always.\nset -o noclobber\n")
+  });
+
+  var cpu = C.machine.cpu || 'unknown';
+  LX.fs.root = D({
+    home: D({ analyst: home }),
+    tmp: D({}),
+    etc: D({
+      hostname: F('lynnux\n'),
+      motd: F('welcome to lynnux. this is a forensic workstation.\nwrite-blocker is ON. evidence stays untouched. have fun.\n'),
+      'os-release': F('NAME="lynnux"\nPRETTY_NAME="lynnux forensic workstation"\nID=lynnux\nID_LIKE=cachyos arch\nHOME_URL="https://' + C.domain + '"\nBUILD_ID=rolling\n'),
+      passwd: F('root:x:0:0:root:/root:/bin/bash\n' + C.handle + ':x:1000:1000:' + C.handle + ':/home/' + C.handle + ':/bin/zsh\nanalyst:x:1001:1001:guest analyst:/home/analyst:/bin/lxsh\nsuspect_47:x:4747:4747:do not trust:/nonexistent:/usr/sbin/nologin\n'),
+      shadow: F('', { denied: true }),
+      'hosts': F('127.0.0.1  localhost\n127.0.1.1  lynnux\n# 198.51.100.23  update.telemetry-cdn.example   <- blocked after case LX-004\n')
+    }),
+    proc: D({
+      cpuinfo: F('processor\t: 0\nmodel name\t: ' + cpu + '\nflags\t\t: fpu sse4_2 avx2 aes sha_ni forensics write_blocker\nbogomips\t: 5606.40\n'),
+      meminfo: F('MemTotal:       ' + C.machine.mem + '\nMemFree:        enough\nEvidenceCache:  plenty\n'),
+      version: F('Linux version ' + C.machine.kernel + ' (lynnux) #1 SMP PREEMPT_DYNAMIC\n'),
+      uptime: F(Math.floor(performance.now() / 1000) + '.00 0.00\n')
+    }),
+    var: D({ log: D({ 'auth.log': { t: 'f', get text() { return LX.authlog.join('\n') + '\n'; } } }) })
+  });
+  LX.fs.cwd = LX.HOME;
+};
