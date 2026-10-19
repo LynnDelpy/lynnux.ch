@@ -26,22 +26,24 @@ var LX_CONFIG = {
     '',
     'i do digital forensics, mostly in ctfs: disk images, memory dumps,',
     'packet captures, and files that pretend to be other files.',
-    'based in switzerland, running cachyos (arch based, so yes, btw).',
+    'based in switzerland. i use arch, btw.',
     '',
     'this site is a forensic workstation. ~/cases has real challenges:',
     'real files you can solve right here in the browser, or download',
     'and throw at your own tools. everything you need is on this machine.'
   ],
 
-  // `neofetch`
+  // `fastfetch` (the silly stats live in js/fun.js). null = line hidden
   machine: {
-    os: 'CachyOS x86_64',
-    kernel: '6.17-cachyos',
-    cpu: 'Intel i7-1165G7 (8) @ 4.7GHz',
-    mem: '16 GiB',
-    shell: 'zsh',
-    de: null,      // TODO e.g. 'Hyprland'
-    editor: null   // TODO
+    os: 'Arch Linux x86_64',
+    kernel: '6.17.2-arch1-1',
+    host: null,     // TODO laptop model, e.g. 'ThinkPad T14 Gen 2'
+    cpu: 'Intel(R) Core(TM) i7-1165G7 (8) @ 4.70 GHz',
+    gpu: 'Intel Iris Xe Graphics @ 1.30 GHz [Integrated]',
+    mem: '15.42 GiB',
+    shell: 'zsh 5.9',
+    wm: null,       // TODO e.g. 'Hyprland (Wayland)'
+    terminal: null  // TODO e.g. 'kitty 0.43.1'
   },
 
   // writeups shown in ~/writeups. [{title, url}]

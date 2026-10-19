@@ -1,4 +1,4 @@
-// fun.js :: neofetch, fortune, the magic bytes quiz, enhance, small gags
+// fun.js :: fastfetch, fortune, the magic bytes quiz, enhance, small gags
 'use strict';
 
 (function () {
@@ -19,39 +19,106 @@
     if (!any) ctx.out.text('no links configured yet.', 'c-dim');
   });
 
-  // ------------------------------------------------------------ neofetch
-  var LOGO = [
-    '      _.-----._      ',
-    '    .\'  .---.  \'.    ',
-    '   /   /     \\   \\   ',
-    '  |   |  0x4c |   |  ',
-    '  |   |  0x58 |   |  ',
-    '   \\   \\     /   /   ',
-    '    \'._ \'---\' _.\\\\   ',
-    '       \'-----\'  \\\\\\  ',
-    '                 \\\\\\ ',
-    '                  \\\\\\'
+  // ------------------------------------------------------------ fastfetch
+  // the arch logos fastfetch ships with (big + small)
+  var ARCH = [
+    '                  -`',
+    '                 .o+`',
+    '                `ooo/',
+    '               `+oooo:',
+    '              `+oooooo:',
+    '              -+oooooo+:',
+    '            `/:-:++oooo+:',
+    '           `/++++/+++++++:',
+    '          `/++++++++++++++:',
+    '         `/+++ooooooooooooo/`',
+    '        ./ooosssso++osssssso+`',
+    '       .oossssso-````/ossssss+`',
+    '      -osssssso.      :ssssssso.',
+    '     :osssssss/        osssso+++.',
+    '    /ossssssss/        +ssssooo/-',
+    '  `/ossssso+/:-        -:/+osssso+-',
+    ' `+sso+:-`                 `.-/+oso:',
+    '`++:.                           `-/+/',
+    '.`                                 `/'
   ];
-  def('neofetch', { cat: 'fun', help: 'system info, but make it pretty' }, function (ctx) {
-    var C = LX_CONFIG, M = C.machine, s = Math.floor((Date.now() - LX.bootTime) / 1000);
-    var info = [
-      span('c-amber b', LX.USER) + span('c-dim', '@') + span('c-amber b', 'lynnux'),
-      span('c-faint', '──────────────'),
-      ['os', M.os], ['host', C.domain], ['kernel', M.kernel], ['uptime', Math.floor(s / 60) + ' mins (this session)'],
-      ['shell', 'lxsh 1.0 (guest)'], M.de ? ['de/wm', M.de] : null, M.editor ? ['editor', M.editor] : null,
-      ['cpu', M.cpu], ['memory', M.mem], ['theme', 'evidence-amber [dark]'], ['cases', LX.cases.solvedCount() + '/' + LX.cases.total() + ' closed'],
-      '',
-      ['#1a1b1e', '#ff5f56', '#9ece6a', '#ffb000', '#7aa2f7', '#bb9af7', '#4fd6be', '#c8ccd2'].map(function (c, i) {
-        return '<span class="' + ['c-faint', 'c-red', 'c-green', 'c-amber', 'c-blue', 'c-violet', 'c-cyan', 'c-fg'][i] + '">███</span>';
-      }).join('')
-    ].filter(function (x) { return x !== null; });
-    var rows = Math.max(LOGO.length, info.length), out = [];
-    for (var i = 0; i < rows; i++) {
-      var l = LOGO[i] || ' '.repeat(LOGO[0].length), r = info[i] || '';
-      if (Array.isArray(r)) r = span('c-amber', r[0]) + span('c-dim', ': ') + esc(r[1]);
-      out.push(span('c-amber', l) + '  ' + r);
+  var ARCH_SMALL = [
+    '      /\\',
+    '     /  \\',
+    '    /\\   \\',
+    '   /      \\',
+    '  /   ,,   \\',
+    ' /   |  |  -\\',
+    "/_-''    ''-_\\"
+  ];
+  function bar(pct) {
+    var f = Math.round(Math.min(100, pct) / 10), cls = pct < 50 ? 'c-green' : pct < 80 ? 'c-amber' : 'c-red';
+    return '[' + span(cls, '■'.repeat(f)) + span('c-faint', '■'.repeat(10 - f)) + '] ' + span(cls, Math.round(pct) + '%');
+  }
+  // what any website can see about you. computed here, shown to you, sent nowhere
+  function visitorTrace() {
+    var ua = navigator.userAgent || '';
+    var br = /Firefox\//.test(ua) ? 'Firefox' : /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'a browser';
+    var os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS X/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : 'something';
+    var tz = '';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { /* fine */ }
+    return [br + ' on ' + os + (tz ? ' · ' + tz : '') + (navigator.hardwareConcurrency ? ' · ' + navigator.hardwareConcurrency + ' threads' : ''),
+      os === 'Windows' ? ' (we can work on that)' : os === 'Linux' ? ' (respect)' : ''];
+  }
+  def('fastfetch', { cat: 'fun', help: 'system info, plus some very honest stats' }, function (ctx) {
+    var C = LX_CONFIG, M = C.machine;
+    var mins = Math.floor((Date.now() - LX.bootTime) / 60000) + 9;
+    var up = 420 + ' days, ' + (6 + Math.floor(mins / 60)) + ' hours, ' + (mins % 60) + ' mins';
+    var h = new Date().getHours() + new Date().getMinutes() / 60;
+    var coffee = Math.max(0.2, Math.min(4.2, (h - 6) * 0.3));
+    var evBytes = 0, evFiles = 0;
+    Object.keys(LX_EVIDENCE.files).forEach(function (k) { LX_EVIDENCE.files[k].forEach(function (f) { evBytes += f.size; evFiles++; }); });
+    var n = LX.cases.solvedCount(), t = LX.cases.total(), you = visitorTrace();
+    // [key, plain value, optional html value]
+    var rows = [
+      ['OS', M.os], ['Host', M.host || C.domain + ' (forensic workstation)'], ['Kernel', 'Linux ' + M.kernel], ['Uptime', up],
+      ['Packages', '1337 (pacman), 42 (aur), 0 (snap, never)'], ['Shell', M.shell],
+      M.wm ? ['WM', M.wm] : null, M.terminal ? ['Terminal', M.terminal] : null,
+      ['CPU', M.cpu], ['GPU', M.gpu],
+      ['Memory', M.mem + ' / ' + M.mem + ' 100% (214 tabs)', M.mem + ' / ' + M.mem + ' ' + bar(100) + span('c-dim', ' 214 tabs')],
+      ['Swap', '100%, not great, not terrible', '8.00 GiB ' + bar(100) + span('c-dim', ' not great, not terrible')],
+      ['Disk (/)', '476.94 GiB 99% btrfs, mostly disk images', '476.94 GiB ' + bar(99) + span('c-dim', ' btrfs, mostly disk images')],
+      ['Battery', '4% [Discharging] (claims 9h left. it lies.)'],
+      'forensics',
+      ['Evidence', t + ' cases · ' + LX.fmtSize(evBytes) + ' in ' + evFiles + ' files · 0 bytes modified'],
+      ['Hashrate', '13.37 GH/s sha256 (on paper)'],
+      ['Carved', '31,337 files (4,096 were cat pictures)'],
+      ['Deleted', 'still not gone (100% of the time)'],
+      ['Coffee', coffee.toFixed(1) + ' / 3.0 L' + (coffee > 3 ? ' (send help)' : ''), coffee.toFixed(1) + ' / 3.0 L ' + bar(coffee / 3 * 100) + (coffee > 3 ? span('c-red', ' send help') : '')],
+      ['Sleep', '3h 41m (ctf weekend)'],
+      ['Flags (you)', n + ' / ' + t, n + ' / ' + t + ' ' + bar(n / t * 100)],
+      ['Trace (you)', you[0] + you[1], esc(you[0]) + span('c-dim', you[1])]
+    ].filter(Boolean);
+    if (ctx.piped) { // like the real one: no logo, no colours when piped
+      ctx.out.text(LX.USER + '@lynnux');
+      rows.forEach(function (r) { if (Array.isArray(r)) ctx.out.text(r[0] + ': ' + r[1]); });
+      return;
     }
-    ctx.out.pre(out.join('\n'));
+    // on phones only the essentials are shown (css hides .ff-x), the rest is for bigger screens
+    var EXTRA = { Host: 1, Shell: 1, WM: 1, Terminal: 1, GPU: 1, Swap: 1, 'Disk (/)': 1, Battery: 1, Hashrate: 1, Carved: 1, Deleted: 1, Sleep: 1, 'Trace (you)': 1 };
+    var info = [[span('c-arch b', LX.USER) + '@' + span('c-arch b', 'lynnux')], [span('c-faint', '─'.repeat(14))]];
+    rows.forEach(function (r) {
+      if (r === 'forensics') info.push([span('c-faint', '─── ') + span('c-amber', 'forensics') + span('c-faint', ' ' + '─'.repeat(20))]);
+      else info.push([span('c-arch b', r[0]) + ': ' + (r[2] || esc(r[1])), EXTRA[r[0]] ? 'ff-x' : '']);
+    });
+    info.push(['&nbsp;', 'ff-x']);
+    info.push([['c-faint', 'c-red', 'c-green', 'c-amber', 'c-blue', 'c-violet', 'c-cyan', 'c-fg'].map(function (c) { return '<span class="' + c + '">███</span>'; }).join(''), 'ff-x']);
+    var wrap = document.createElement('div'); wrap.className = 'ff';
+    var lg = document.createElement('div'); lg.className = 'ff-logo lg'; lg.textContent = ARCH.join('\n');
+    var sm = document.createElement('div'); sm.className = 'ff-logo sm'; sm.textContent = ARCH_SMALL.join('\n');
+    var box = document.createElement('div'); box.className = 'ff-info';
+    box.innerHTML = info.map(function (l) { return '<div' + (l[1] ? ' class="' + l[1] + '"' : '') + '>' + l[0] + '</div>'; }).join('');
+    wrap.appendChild(lg); wrap.appendChild(sm); wrap.appendChild(box);
+    ctx.out.el(wrap);
+  });
+  def('neofetch', { cat: 'fun', hidden: true }, function (ctx) {
+    ctx.out.html(span('c-dim', 'neofetch: upstream archived it in 2024. this is an arch box, we use ') + span('c-arch', 'fastfetch') + span('c-dim', ' now.'));
+    return LX.cmds.fastfetch.fn(ctx);
   });
 
   // ------------------------------------------------------------ fortune
@@ -93,7 +160,7 @@
     lynn: [
       'forensics is reading a story backwards, from the mess to the cause.',
       'the best challenge makes you feel dumb, then smart, then dumb again.',
-      'cachyos, because waiting for compiles is for other people.',
+      'arch: install it once, configure it forever.',
       'if you are reading the fortunes, you are definitely the kind of person who would like ~/cases.',
       'a good hint teaches a technique. a bad hint just gives the answer.'
     ]
@@ -215,5 +282,5 @@
   gag('coffee', span('c-amber', '☕ brewing...') + span('c-dim', ' evidence suggests you have had enough.'));
   gag('pacman', span('c-dim', 'error: you cannot perform this operation unless you are root. (but nice, a fellow arch person)'));
   LX.cmds.paru = LX.cmds.pacman; LX.cmds.yay = LX.cmds.pacman;
-  gag('btw', span('c-amber', 'i use cachyos, which is arch, btw.'));
+  gag('btw', span('c-arch', 'i use arch, btw.'));
 })();

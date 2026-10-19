@@ -56,7 +56,7 @@ def load_flags(new=False):
 def font(size, bold=True):
     for p in ['/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf' if bold else
               '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf',
-              '/usr/share/fonts/TTF/DejaVuSansMono-Bold.ttf',  # arch / cachyos path
+              '/usr/share/fonts/TTF/DejaVuSansMono-Bold.ttf',  # arch path
               '/usr/share/fonts/TTF/DejaVuSansMono.ttf']:
         if os.path.exists(p):
             return ImageFont.truetype(p, size)
@@ -369,7 +369,7 @@ def case_004(flag):
         p.tcp(t + 0.041, me, sp, dst, 80, s + len(req), a + len(resp), 0x11, b'', my_mac, gw_mac)
         t += rng.uniform(0.3, 1.2)
 
-    normal = [('archlinux.org', ['203.0.113.10']), ('mirror.cachyos.org', ['203.0.113.44']),
+    normal = [('archlinux.org', ['203.0.113.10']), ('geo.mirror.pkgbuild.com', ['203.0.113.44']),
               ('github.com', ['203.0.113.3']), ('ctftime.org', ['198.51.100.71']),
               ('en.wikipedia.org', ['198.51.100.12']), ('discord.com', ['203.0.113.92', '203.0.113.93']),
               ('fonts.gstatic.com', ['198.51.100.140']), ('api.github.com', ['203.0.113.5']),

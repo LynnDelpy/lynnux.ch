@@ -81,10 +81,20 @@ LX.buildFS = function () {
   LX.fs.root = D({
     home: D({ analyst: home }),
     tmp: D({}),
+    dev: D({
+      'null': F('', { devnull: true }),
+      zero: { t: 'b', data: new Uint8Array(4096) },
+      urandom: { t: 'b', get data() { return crypto.getRandomValues(new Uint8Array(4096)); } },
+      // the suspect's usb stick from the boot log. same bytes as ~/cases/case-005/usb.img
+      sdb: (function () {
+        var f = (LX_EVIDENCE.files['005'] || [])[0];
+        return f ? { t: 'b', src: f.path, size: f.size, md5: f.md5, sha256: f.sha256, ro: true } : F('');
+      })()
+    }),
     etc: D({
       hostname: F('lynnux\n'),
       motd: F('welcome to lynnux. this is a forensic workstation.\nwrite-blocker is ON. evidence stays untouched. have fun.\n'),
-      'os-release': F('NAME="lynnux"\nPRETTY_NAME="lynnux forensic workstation"\nID=lynnux\nID_LIKE=cachyos arch\nHOME_URL="https://' + C.domain + '"\nBUILD_ID=rolling\n'),
+      'os-release': F('NAME="Arch Linux"\nPRETTY_NAME="Arch Linux"\nID=arch\nBUILD_ID=rolling\nVARIANT="lynnux forensic workstation"\nANSI_COLOR="38;2;23;147;209"\nHOME_URL="https://archlinux.org/"\nLOGO=archlinux-logo\n'),
       passwd: F('root:x:0:0:root:/root:/bin/bash\n' + C.handle + ':x:1000:1000:' + C.handle + ':/home/' + C.handle + ':/bin/zsh\nanalyst:x:1001:1001:guest analyst:/home/analyst:/bin/lxsh\nsuspect_47:x:4747:4747:do not trust:/nonexistent:/usr/sbin/nologin\n'),
       shadow: F('', { denied: true }),
       'hosts': F('127.0.0.1  localhost\n127.0.1.1  lynnux\n# 198.51.100.23  update.telemetry-cdn.example   <- blocked after case LX-004\n')

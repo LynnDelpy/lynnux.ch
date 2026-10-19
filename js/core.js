@@ -107,7 +107,7 @@ LX.fs = {
   },
   // the write-blocker: evidence and system dirs are read-only
   writable: function (abs) {
-    return !/^\/(home\/analyst\/cases|etc|proc|bin|usr|var)(\/|$)/.test(abs) && abs !== '/' && abs !== '/home';
+    return !/^\/(home\/analyst\/cases|etc|proc|bin|usr|var|dev)(\/|$)/.test(abs) && abs !== '/' && abs !== '/home';
   },
   // put a node somewhere. returns abs path or throws
   put: function (path, node) {
@@ -231,10 +231,8 @@ QuietErr.prototype.err = function () { this.failed = true; };
 LX.parse = function (line) {
   var chain = [], pipe = [], argv = [], cur = null, glob = false;
   var redir = null, want = null, quietErr = false, op = null, i = 0;
-  function vars(name) {
-    var env = { HOME: LX.HOME, USER: LX.USER, PWD: LX.fs.cwd, HOSTNAME: 'lynnux', SHELL: '/bin/lxsh', '?': String(LX.status), RANDOM: String(Math.floor(Math.random() * 32768)) };
-    return name in env ? env[name] : '';
-  }
+  // variables are expanded later, right before their pipeline runs (so `cmd; echo $?` works)
+  function vars(name) { return '\u0001' + name + '\u0002'; }
   function push() {
     if (cur === null) return;
     if (want === '2>') { quietErr = true; want = null; }
@@ -287,17 +285,45 @@ LX.parse = function (line) {
   return chain;
 };
 
+LX.expandVars = function (s) {
+  return s.replace(/\u0001(\w+|\?)\u0002/g, function (m, name) {
+    var env = { HOME: LX.HOME, USER: LX.USER, PWD: LX.fs.cwd, HOSTNAME: 'lynnux', SHELL: '/bin/lxsh', '?': String(LX.status), RANDOM: String(Math.floor(Math.random() * 32768)) };
+    return name in env ? env[name] : '';
+  });
+};
+
 // expand {glob:'*.png'} args against the virtual fs
+// walks the pattern one path segment at a time, so ~/cases/*/*.png works.
+// no match keeps the pattern as is, like bash does
 LX.expandGlobs = function (argv) {
   var out = [];
   argv.forEach(function (a) {
     if (typeof a === 'string') { out.push(a); return; }
-    var pat = a.glob, slash = pat.lastIndexOf('/');
-    var dirPart = slash >= 0 ? pat.slice(0, slash + 1) : '', base = pat.slice(slash + 1);
-    var dir = LX.fs.get(LX.fs.norm(dirPart || '.'));
-    var re = new RegExp('^' + base.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$');
-    var hits = dir && dir.t === 'd' ? Object.keys(dir.c).filter(function (k) { return re.test(k) && (k[0] !== '.' || base[0] === '.'); }).sort() : [];
-    if (hits.length) hits.forEach(function (h) { out.push(dirPart + h); }); else out.push(pat);
+    var pat = a.glob, segs = pat.split('/'), level;
+    // each entry: [what we print, absolute path]
+    if (pat[0] === '/') { level = [['', '/']]; segs.shift(); }
+    else if (segs[0] === '~') { level = [['~', LX.HOME]]; segs.shift(); }
+    else level = [[null, LX.fs.cwd]];
+    segs.forEach(function (seg) {
+      var next = [];
+      level.forEach(function (e) {
+        var join = function (k) { return e[0] === null ? k : e[0] === '' ? '/' + k : e[0] + '/' + k; };
+        if (!seg) { next.push([e[0] === null ? '' : e[0] + '/', e[1]]); return; }
+        if (!/[*?]/.test(seg)) {
+          var ab = LX.fs.norm(e[1] + '/' + seg);
+          if (LX.fs.get(ab)) next.push([join(seg), ab]);
+          return;
+        }
+        var dir = LX.fs.get(e[1]);
+        if (!dir || dir.t !== 'd') return;
+        var re = new RegExp('^' + seg.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$');
+        Object.keys(dir.c).sort().forEach(function (k) {
+          if (re.test(k) && (k[0] !== '.' || seg[0] === '.')) next.push([join(k), e[1] === '/' ? '/' + k : e[1] + '/' + k]);
+        });
+      });
+      level = next;
+    });
+    if (level.length) level.forEach(function (e) { out.push(e[0]); }); else out.push(pat);
   });
   return out;
 };
@@ -340,10 +366,11 @@ LX.run = async function (line, opts) {
 LX.runPipe = async function (c, signal) {
   var stdin = null, stdinBytes = null, status = 0, out = null;
   for (var s = 0; s < c.pipe.length; s++) {
-    var argv = LX.expandGlobs(c.pipe[s]);
+    var argv = LX.expandGlobs(c.pipe[s].map(function (a) { return typeof a === 'string' ? LX.expandVars(a) : { glob: LX.expandVars(a.glob) }; }));
     // aliases, one level deep
     if (LX.aliases[argv[0]]) {
-      argv = LX.parse(LX.aliases[argv[0]])[0].pipe[0].concat(argv.slice(1));
+      var al = LX.parse(LX.aliases[argv[0]])[0].pipe[0];
+      argv = LX.expandGlobs(al.map(function (a) { return typeof a === 'string' ? LX.expandVars(a) : { glob: LX.expandVars(a.glob) }; })).concat(argv.slice(1));
     }
     var name = argv[0], last = s === c.pipe.length - 1;
     var capture = !last || !!c.redir;
@@ -379,7 +406,8 @@ LX.runPipe = async function (c, signal) {
   }
   if (c.redir) {
     try {
-      var abs = LX.fs.norm(c.redir.file), ex = LX.fs.get(abs);
+      var abs = LX.fs.norm(LX.expandVars(c.redir.file)), ex = LX.fs.get(abs);
+      if (abs === '/dev/null') return status;
       if (ex && ex.t === 'd') throw new Error(c.redir.file + ': Is a directory');
       if (stdinBytes) LX.fs.put(abs, { t: 'b', data: stdinBytes });
       else if (c.redir.append && ex && ex.t === 'f') {

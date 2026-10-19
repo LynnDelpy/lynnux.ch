@@ -42,9 +42,9 @@ var LX_EVIDENCE={
    {
     "name": "capture.pcap",
     "path": "evidence/case-004/capture.pcap",
-    "size": 8133,
-    "md5": "450e59bbcd1b0dcfee93905727eb6192",
-    "sha256": "6aecbd672cf13802a93cfae034b9b1645bc18d879fea7f56b0f85a95d1b5e3a7"
+    "size": 8143,
+    "md5": "38c9fb220c3071c3511d6c04f1596856",
+    "sha256": "6c7ed883fed8e6f201b7126737fd4d15b5ee4a09c0b34dc28465ec15beb17ced"
    }
   ],
   "005": [

@@ -44,7 +44,7 @@ need that.
 ## make it yours
 
 everything personal is in **`js/config.js`**: links, email, about text,
-neofetch info, writeups. anything set to `null` is hidden.
+fastfetch info, writeups. anything set to `null` is hidden.
 
 ## (re)building the evidence
 
@@ -96,7 +96,7 @@ js/forensics.js       file, strings, xxd, exiftool, binwalk, dd, unzip, hashes
 js/viewers.js         view, stegsolve, spectrogram, play
 js/netdisk.js         tcpdump, fsstat, fls, icat
 js/cases.js           case briefings, hints, submit
-js/fun.js             neofetch, fortune, magic, enhance
+js/fun.js             fastfetch, fortune, magic, enhance
 js/gui.js             the plain view panel
 js/boot.js            boot sequence
 js/evidence.gen.js    generated: flag hashes + evidence file hashes

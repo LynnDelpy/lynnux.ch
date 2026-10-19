@@ -35,16 +35,6 @@
   clock(); setInterval(clock, 10000);
 
   // ---- boot sequence
-  var BANNER = [
-    '██╗  ██╗   ██╗███╗   ██╗███╗   ██╗██╗   ██╗██╗  ██╗',
-    '██║  ╚██╗ ██╔╝████╗  ██║████╗  ██║██║   ██║╚██╗██╔╝',
-    '██║   ╚████╔╝ ██╔██╗ ██║██╔██╗ ██║██║   ██║ ╚███╔╝ ',
-    '██║    ╚██╔╝  ██║╚██╗██║██║╚██╗██║██║   ██║ ██╔██╗ ',
-    '███████╗██║   ██║ ╚████║██║ ╚████║╚██████╔╝██╔╝ ██╗',
-    '╚══════╝╚═╝   ╚═╝  ╚═══╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝'
-  ].join('\n');
-
-
   var usb = (LX_EVIDENCE.files['005'] || [{}])[0];
   var skip = false, returning = LX.store.get('visited', false);
   function skipper() { skip = true; }
@@ -57,29 +47,25 @@
     var out = LX.term;
     LX.running = { abort: skipper }; // ctrl+c during boot just skips it
     LX.ui.busy(true);
-    out.html(t(0) + 'lynnux forensic workstation, kernel ' + esc(LX_CONFIG.machine.kernel));
+    out.html(t(0) + span('c-arch', 'Arch Linux') + ' ' + esc(LX_CONFIG.machine.kernel) + ' · lynnux forensic workstation');
     await wait(120);
     out.html(t(0.001337) + span('c-green', 'write-blocker: engaged') + ', all evidence mounted read-only');
     await wait(140);
-    out.html(t(0.084211) + 'usb 2-1: new evidence device: ' + span('c-amber', 'SUSPECT_USB') + ' (360 KiB, FAT12)');
-    await wait(120);
-    var bar = out.html(t(0.120004) + 'imaging /dev/sdb -> usb.img  ');
+    var bar = out.html(t(0.084211) + 'usb 2-1: ' + span('c-amber', 'SUSPECT_USB') + ' imaging -> usb.img  ');
     for (var p = 0; p <= 20; p++) {
-      bar.innerHTML = t(0.120004) + 'imaging /dev/sdb -> usb.img  <span class="bar">' + '█'.repeat(p) + '<span class="rest">' + '░'.repeat(20 - p) + '</span></span> ' + (p * 5) + '%';
+      bar.innerHTML = t(0.084211) + 'usb 2-1: ' + span('c-amber', 'SUSPECT_USB') + ' imaging -> usb.img  <span class="bar">' + '█'.repeat(p) + '<span class="rest">' + '░'.repeat(20 - p) + '</span></span> ' + (p * 5) + '%';
       await wait(28);
     }
     out.html(t(0.140117) + 'sha256 ' + esc((usb.sha256 || '').slice(0, 32)) + '... ' + span('c-green', 'verified ✓'));
     await wait(120);
-    out.html(t(0.160522) + 'loaded ' + LX.cases.total() + ' cases into ~/cases');
-    await wait(100);
-    out.html(t(0.171000) + 'guest session for ' + span('c-amber', 'analyst') + ' opened');
+    out.html(t(0.160522) + 'loaded ' + LX.cases.total() + ' cases into ~/cases, guest session for ' + span('c-amber', 'analyst') + ' opened');
     await wait(220);
     out.text('');
-    out.pre(BANNER, 'banner');
-    out.html('lynnux<span class="cur">_</span>', 'banner-sm');
-    out.html(span('c-dim', '  ' + LX_CONFIG.tagline + '  ·  ' + LX_CONFIG.location));
+    // like any self respecting arch install, the shell runs fastfetch on start
+    LX.term.echo('fastfetch');
+    LX.cmds.fastfetch.fn({ args: [], stdin: null, out: out, piped: false });
     out.text('');
-    out.html('welcome, analyst. this is ' + span('c-amber', LX_CONFIG.handle) + "'s forensic workstation.");
+    out.html('welcome, analyst. this is ' + span('c-amber', LX_CONFIG.handle) + "'s forensic workstation." + span('c-dim', '  ' + LX_CONFIG.tagline + ' · ' + LX_CONFIG.location));
     out.text('');
     [['cases', 'real forensics challenges, solvable right here'], ['about', 'who runs this machine'], ['contact', 'links + how to reach me'], ['help', 'every command (there are a lot)']].forEach(function (r) {
       out.html('  ' + span('c-amber', '▸ ') + LX.cmdLink(r[0], LX.pad(r[0], 10), 'c-cyan') + span('c-dim', r[1]));
@@ -93,6 +79,7 @@
     document.removeEventListener('keydown', skipper);
     document.removeEventListener('pointerdown', skipper);
     LX.running = null;
+    LX.booted = true;
     LX.ui.busy(false);
     LX.ui.updatePrompt();
   }

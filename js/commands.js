@@ -238,11 +238,18 @@
     if (e) s = s.replace(/\\x([0-9a-fA-F]{2})|\\n|\\t|\\\\/g, function (m, h) { return h ? String.fromCharCode(parseInt(h, 16)) : m === '\\n' ? '\n' : m === '\\t' ? '\t' : '\\'; });
     ctx.out.text(s);
   });
-  def('grep', { cat: 'text', help: 'search for a pattern (regex)', usage: 'grep [-ivnocaFr] pattern [file...]' }, async function (ctx) {
-    var o = LX.opts(ctx.args, { flags: 'ivnocaFrEhH', vals: 'm' });
-    if (!o.rest.length) return ctx.out.err('usage: grep [-ivnocaFr] pattern [file...]');
-    var pat = o.rest[0], files = o.rest.slice(1), re;
-    try { re = new RegExp(o.f.F ? pat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : pat, 'g' + (o.f.i ? 'i' : '')); }
+  def('grep', { cat: 'text', help: 'search for a pattern (regex)', usage: 'grep [-ivnocaFr] [-e pattern]... pattern [file...]' }, async function (ctx) {
+    // -e can repeat, so pull those out before the normal option parsing
+    var args = [], pats = [];
+    for (var ai = 0; ai < ctx.args.length; ai++) {
+      if (ctx.args[ai] === '-e' && ai + 1 < ctx.args.length) pats.push(ctx.args[++ai]);
+      else args.push(ctx.args[ai]);
+    }
+    var o = LX.opts(args, { flags: 'ivnocaFrEhH', vals: 'm' });
+    if (!pats.length) pats = o.rest.splice(0, 1);
+    if (!pats.length) return ctx.out.err('usage: grep [-ivnocaFr] [-e pattern]... pattern [file...]');
+    var files = o.rest, re;
+    try { re = new RegExp(pats.map(function (pat) { return o.f.F ? pat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '(?:' + pat + ')'; }).join('|'), 'g' + (o.f.i ? 'i' : '')); }
     catch (e) { return ctx.out.err('grep: bad regex: ' + e.message); }
     var hit = false, max = o.v.m ? LX.num(o.v.m) : Infinity;
     if (o.f.r && !files.length) files = ['.'];
