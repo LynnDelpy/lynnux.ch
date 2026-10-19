@@ -10,8 +10,9 @@ var LX = {
   histTimes: [],
   status: 0,
   keys: [],
-  HOME: '/home/analyst',
-  USER: 'analyst'
+  HOME: '/home/guest',
+  USER: 'guest',
+  HOST: LX_CONFIG.host
 };
 
 // ---------------------------------------------------------------- helpers
@@ -108,7 +109,8 @@ LX.fs = {
   },
   // the write-blocker: evidence and system dirs are read-only
   writable: function (abs) {
-    return !/^\/(home\/analyst\/cases|etc|proc|bin|usr|var|dev)(\/|$)/.test(abs) && abs !== '/' && abs !== '/home';
+    var ro = ['/etc', '/proc', '/bin', '/usr', '/var', '/dev', LX.HOME + '/cases'];
+    return !ro.some(function (p) { return abs === p || abs.indexOf(p + '/') === 0; }) && abs !== '/' && abs !== '/home';
   },
   // put a node somewhere. returns abs path or throws
   put: function (path, node) {
@@ -336,7 +338,7 @@ LX.suggest = function (v) {
 
 LX.expandVars = function (s) {
   return s.replace(/\u0001(\w+|\?)\u0002/g, function (m, name) {
-    var env = { HOME: LX.HOME, USER: LX.USER, PWD: LX.fs.cwd, HOSTNAME: 'lynnux', SHELL: '/usr/bin/zsh', '0': 'zsh', ZSH_VERSION: '5.9', '?': String(LX.status), RANDOM: String(Math.floor(Math.random() * 32768)) };
+    var env = { HOME: LX.HOME, USER: LX.USER, PWD: LX.fs.cwd, HOSTNAME: LX.HOST, SHELL: '/usr/bin/zsh', '0': 'zsh', ZSH_VERSION: '5.9', '?': String(LX.status), RANDOM: String(Math.floor(Math.random() * 32768)) };
     return name in env ? env[name] : '';
   });
 };
@@ -484,9 +486,9 @@ LX.lev = function (a, b) {
 LX.ui = {
   out: LX.$('out'), input: LX.$('in'), hl: LX.$('in-hl'), pl: LX.$('pl'), ps1: LX.$('ps1'),
   suggestion: '',
-  // PROMPT='%F{214}%n@%m%f %F{cyan}%~%f %(?.%F{green}.%F{red})❯%f '
+  // PROMPT='%F{214}%m%f %F{cyan}%~%f %(?.%F{green}.%F{red})❯%f '
   promptHTML: function () {
-    return '<span class="u">' + LX.USER + '</span><span class="at">@</span><span class="h">lynnux</span> ' +
+    return '<span class="h">' + LX.esc(LX.HOST) + '</span> ' +
       '<span class="p">' + LX.esc(LX.fs.display(LX.fs.cwd)) + '</span> <span class="' + (LX.status ? 'c-red' : 'c-green') + '">❯</span> ';
   },
   // repaint the highlighted mirror behind the input, plus the grey autosuggestion

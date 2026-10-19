@@ -2,8 +2,7 @@
 // any link set to null is hidden everywhere (terminal + plain view).
 
 var LX_CONFIG = {
-  handle: 'lynn',
-  host: 'lynnux',
+  host: 'lucia',        // the machine name, shown in the prompt
   domain: 'lynnux.ch',
   tagline: 'digital forensics · ctf · linux',
   location: 'switzerland',
@@ -22,7 +21,7 @@ var LX_CONFIG = {
 
   // shown by `cat about.txt` and in the plain view. one string per line.
   about: [
-    "hi, i'm lynn.",
+    'hi :)',
     '',
     'i do digital forensics, mostly in ctfs: disk images, memory dumps,',
     'packet captures, and files that pretend to be other files.',
@@ -33,14 +32,20 @@ var LX_CONFIG = {
     'and throw at your own tools. everything you need is on this machine.'
   ],
 
-  // `fastfetch` / `hyfetch` (the silly stats live in js/fun.js). null = line hidden
+  // `fastfetch` / `hyfetch`. this machine is... aspirational. null = line hidden
+  // (keep values under ~55 chars or the line wraps next to the logo)
   machine: {
     os: 'Arch Linux x86_64',
     kernel: '6.17.2-arch1-1',
-    host: null,     // TODO laptop model, e.g. 'ThinkPad T14 Gen 2'
-    cpu: 'Intel(R) Core(TM) i7-1165G7 (8) @ 4.70 GHz',
-    gpu: 'Intel Iris Xe Graphics @ 1.30 GHz [Integrated]',
-    mem: '15.42 GiB',
+    host: 'a 42U rack in the living room',
+    display: '3x 5120x2160 @ 240 Hz (one is just for htop)',
+    cpu: 'AMD Ryzen Threadripper PRO 9995WX (192) @ 5.40 GHz',
+    gpu: '4x NVIDIA RTX PRO 6000 Blackwell (96 GB each)',
+    mem: '1.00 TiB',
+    swap: '2.00 TiB',
+    disk: '64.0 TiB',
+    power: '2.4 kW at idle (the lights flicker)',
+    temp: '31°C (LN2, plus a swiss basement)',
     shell: 'zsh 5.9',
     de: 'KDE Plasma 6.5',            // TODO match `plasmashell --version`
     wm: 'KWin (Wayland)',

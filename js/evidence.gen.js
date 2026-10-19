@@ -33,9 +33,9 @@ var LX_EVIDENCE={
    {
     "name": "lake.jpg",
     "path": "evidence/case-003/lake.jpg",
-    "size": 18228,
-    "md5": "a7d3d1381eb88e01b30a30fc7aeb9762",
-    "sha256": "8b590cdb36dd33d8b9d9925ee57be794e1eb20fb3fbd7807a69a877abe69796f"
+    "size": 18220,
+    "md5": "2d3c3836335229f402d1f98626bca865",
+    "sha256": "b28a0ceda8b3e30a3d0fa5e956fc4500d010bc9d7cc7b27588e98cbd3fbde3bb"
    }
   ],
   "004": [
@@ -52,8 +52,8 @@ var LX_EVIDENCE={
     "name": "usb.img",
     "path": "evidence/case-005/usb.img",
     "size": 368640,
-    "md5": "9a3f1c334b36e9624a2928b45137a73f",
-    "sha256": "cd9e387dd8cc24bcd2900f630fd84c4b088237a642ee18fcbcc3af399418e62a"
+    "md5": "b70b72c811eac525684babad05faacee",
+    "sha256": "a874832379d95b4a0337df06ef273510ab1cb8cb4539770f27aa4aa3a7a94287"
    }
   ],
   "006": [

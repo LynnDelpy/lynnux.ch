@@ -261,7 +261,7 @@ def case_003(flag):
                    'day 4  delete everything. EVERYTHING.\n', zipfile.ZIP_DEFLATED)
         z.writestr(info('flag.txt'),
                    'if you are reading this, you carved me out of a jpeg.\n'
-                   'nice work, analyst. here is your evidence tag:\n\n'
+                   'nice work. here is your evidence tag:\n\n'
                    '    ' + flag + '\n\n'
                    'tip: real photos end at FF D9. anything after that is a story.\n',
                    zipfile.ZIP_DEFLATED)
@@ -456,7 +456,7 @@ def case_005(flag):
     files = {
         'README.TXT': b'property of suspect_47.\r\nif found please return. and please do not look inside.\r\n',
         'TODO.TXT': b'- buy milk (oat)\r\n- move the stuff off the laptop\r\n- wipe this stick\r\n- ACTUALLY wipe it this time, rm is not enough??\r\n',
-        'GROCERY.TXT': b'oat milk\r\nrosti\r\ngruyere\r\ncoffee, lots\r\n',
+        'GROCERY.TXT': b'oat milk\r\nrosti\r\ngruyere\r\nmate, lots\r\n',
     }
     rng = np.random.default_rng(5)
     # the flag image that gets "deleted"

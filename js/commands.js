@@ -28,7 +28,7 @@
   ];
   def('help', { cat: 'start', help: 'this list. `help <cmd>` for details', usage: 'help [command]' }, function (ctx) {
     if (ctx.args[0]) return LX.cmds.man.fn(ctx);
-    ctx.out.html(span('c-amber b', 'lynnux') + span('c-dim', ' :: forensic workstation, guest shell'));
+    ctx.out.html(span('c-amber b', LX.HOST) + span('c-dim', ' :: forensic workstation, guest shell'));
     CAT_ORDER.forEach(function (c) {
       var names = Object.keys(LX.cmds).filter(function (k) { return LX.cmds[k].cat === c[0] && !LX.cmds[k].hidden; }).sort();
       if (!names.length) return;
@@ -74,7 +74,7 @@
         entries.forEach(function (e) {
           var nd = e[1], ro = nd.ro || !LX.fs.writable(abs);
           var perm = (nd.t === 'd' ? 'd' : nd.t === 'l' ? 'l' : '-') + (nd.t === 'l' ? 'rwxrwxrwx' : ro ? (nd.t === 'd' ? 'r-xr-xr-x' : 'r--r--r--') : (nd.t === 'd' ? 'rwxr-xr-x' : 'rw-r--r--'));
-          var owner = nd.src || abs.indexOf('/home/analyst/cases') === 0 ? 'lynn     evidence' : abs.indexOf('/home') === 0 ? 'analyst  analyst ' : 'root     root    ';
+          var owner = nd.src || abs.indexOf(LX.HOME + '/cases') === 0 ? LX.pad(LX.HOST, 8) + ' evidence' : abs.indexOf('/home') === 0 ? 'guest    guest   ' : 'root     root    ';
           var sz = nd.t === 'd' ? 4096 : nd.t === 'l' ? nd.url.length : LX.fs.size(nd);
           var line = perm + ' 1 ' + owner + ' ' + LX.pad(o.f.h ? LX.fmtSize(sz) : sz, 7, true) + ' ' + lsDate(nd.mtime) + ' ';
           var name = LX.lsName(nd, e[0], e[2]);
@@ -425,10 +425,10 @@
     ctx.out.html(span('c-dim', 'zsh: command not found: fish ') + span('c-faint', '(the autosuggestions here were stolen from it anyway)'));
   });
   def('whoami', { cat: 'system', help: 'who are you' }, function (ctx) { ctx.out.text(LX.USER); });
-  def('id', { cat: 'system', help: 'user identity' }, function (ctx) { ctx.out.text('uid=1001(analyst) gid=1001(analyst) groups=1001(analyst),4747(evidence-ro)'); });
-  def('hostname', { cat: 'system', help: 'machine name' }, function (ctx) { ctx.out.text('lynnux'); });
+  def('id', { cat: 'system', help: 'user identity' }, function (ctx) { ctx.out.text('uid=1001(' + LX.USER + ') gid=1001(' + LX.USER + ') groups=1001(' + LX.USER + '),4747(evidence-ro)'); });
+  def('hostname', { cat: 'system', help: 'machine name' }, function (ctx) { ctx.out.text(LX.HOST); });
   def('uname', { cat: 'system', help: 'kernel info', usage: 'uname [-a]' }, function (ctx) {
-    ctx.out.text(ctx.args[0] === '-a' ? 'Linux lynnux ' + LX_CONFIG.machine.kernel + ' #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux' : 'Linux');
+    ctx.out.text(ctx.args[0] === '-a' ? 'Linux ' + LX.HOST + ' ' + LX_CONFIG.machine.kernel + ' #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux' : 'Linux');
   });
   def('date', { cat: 'system', help: 'current date' }, function (ctx) { ctx.out.text(new Date().toString()); });
   def('uptime', { cat: 'system', help: 'how long this session has been running' }, function (ctx) {
@@ -436,7 +436,7 @@
     ctx.out.text(' ' + new Date().toTimeString().slice(0, 8) + ' up ' + Math.floor(s / 60) + ' min, 1 user (you), load average: 0.47, 0.13, 0.04');
   });
   def('env', { cat: 'system', help: 'environment variables' }, function (ctx) {
-    ctx.out.text(['HOME=' + LX.HOME, 'USER=' + LX.USER, 'SHELL=/usr/bin/zsh', 'ZSH_VERSION=5.9', 'PWD=' + LX.fs.cwd, 'HOSTNAME=lynnux', 'WRITE_BLOCKER=on', 'EDITOR=vim', 'TERM=xterm-256color'].join('\n'));
+    ctx.out.text(['HOME=' + LX.HOME, 'USER=' + LX.USER, 'SHELL=/usr/bin/zsh', 'ZSH_VERSION=5.9', 'PWD=' + LX.fs.cwd, 'HOSTNAME=' + LX.HOST, 'WRITE_BLOCKER=on', 'EDITOR=vim', 'TERM=xterm-256color'].join('\n'));
   });
   def('alias', { cat: 'system', help: 'list or set aliases', usage: "alias [name='command']" }, function (ctx) {
     if (!ctx.args.length) { Object.keys(LX.aliases).sort().forEach(function (k) { ctx.out.text('alias ' + k + "='" + LX.aliases[k] + "'"); }); return; }
@@ -458,8 +458,8 @@
   def('sudo', { cat: 'system', help: 'you know what this does', hidden: true }, function (ctx) {
     var cmd = ctx.args.join(' ');
     var d = new Date(), ts = MON[d.getMonth()] + ' ' + String(d.getDate()).padStart(2) + ' ' + d.toTimeString().slice(0, 8);
-    LX.authlog.push(ts + ' lynnux sudo:  analyst : user NOT in sudoers ; TTY=pts/1 ; PWD=' + LX.fs.cwd + ' ; USER=root ; COMMAND=' + (cmd || '/bin/sh'));
-    ctx.out.html(span('c-red', 'analyst is not in the sudoers file. this incident will be reported.'));
+    LX.authlog.push(ts + ' ' + LX.HOST + ' sudo:  ' + LX.USER + ' : user NOT in sudoers ; TTY=pts/1 ; PWD=' + LX.fs.cwd + ' ; USER=root ; COMMAND=' + (cmd || '/bin/sh'));
+    ctx.out.html(span('c-red', LX.USER + ' is not in the sudoers file. this incident will be reported.'));
     ctx.out.html(span('c-dim', '(it actually was. see ') + LX.cmdLink('tail -n 3 /var/log/auth.log', '/var/log/auth.log', 'c-amber') + span('c-dim', ')'));
   });
   LX.cmds.su = LX.cmds.sudo; LX.cmds.doas = LX.cmds.sudo;

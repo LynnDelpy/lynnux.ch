@@ -1,15 +1,17 @@
 // fsdata.js :: what's on the machine. built at boot from config + cases + generated evidence.
 'use strict';
 
-LX.authlog = [
-  'Jul 31 23:51:02 lynnux sshd[3121]: Failed password for root from 203.0.113.66 port 51122 ssh2',
-  'Jul 31 23:51:04 lynnux sshd[3121]: Failed password for root from 203.0.113.66 port 51122 ssh2',
-  'Jul 31 23:51:09 lynnux sshd[3125]: Invalid user admin from 203.0.113.66 port 51130',
-  'Jul 31 23:52:40 lynnux sshd[3140]: Invalid user suspect_47 from 198.51.100.23 port 40022',
-  'Aug  1 00:00:01 lynnux CRON[3301]: pam_unix(cron:session): session opened for user root',
-  'Aug  1 08:12:55 lynnux sudo:     lynn : TTY=pts/0 ; PWD=/home/lynn ; USER=root ; COMMAND=/usr/bin/dd if=/dev/sdb of=usb.img bs=4M status=progress',
-  'Aug  1 08:13:02 lynnux sudo:     lynn : TTY=pts/0 ; PWD=/home/lynn ; USER=root ; COMMAND=/usr/bin/sha256sum usb.img'
-];
+LX.authlog = (function (h) {
+  return [
+    'Jul 31 23:51:02 ' + h + ' sshd[3121]: Failed password for root from 203.0.113.66 port 51122 ssh2',
+    'Jul 31 23:51:04 ' + h + ' sshd[3121]: Failed password for root from 203.0.113.66 port 51122 ssh2',
+    'Jul 31 23:51:09 ' + h + ' sshd[3125]: Invalid user admin from 203.0.113.66 port 51130',
+    'Jul 31 23:52:40 ' + h + ' sshd[3140]: Invalid user suspect_47 from 198.51.100.23 port 40022',
+    'Aug  1 00:00:01 ' + h + ' CRON[3301]: pam_unix(cron:session): session opened for user root',
+    'Aug  1 08:12:55 ' + h + ' sudo:     ' + h + ' : TTY=pts/0 ; PWD=/home/' + h + ' ; USER=root ; COMMAND=/usr/bin/dd if=/dev/sdb of=usb.img bs=4M status=progress',
+    'Aug  1 08:13:02 ' + h + ' sudo:     ' + h + ' : TTY=pts/0 ; PWD=/home/' + h + ' ; USER=root ; COMMAND=/usr/bin/sha256sum usb.img'
+  ];
+})(LX.HOST);
 
 LX.oldHistory = [
   'cd ~/cases && ls -la',
@@ -80,7 +82,7 @@ LX.buildFS = function () {
       return old.concat(now).join('\n') + '\n';
     } },
     '.zshrc': F([
-      '# ~/.zshrc, provisioned by ' + C.handle + ' for guest analysts',
+      '# ~/.zshrc for guests on ' + LX.HOST,
       'HISTFILE=~/.zsh_history',
       'HISTSIZE=100000',
       'SAVEHIST=100000',
@@ -111,7 +113,7 @@ LX.buildFS = function () {
 
   var cpu = C.machine.cpu || 'unknown';
   LX.fs.root = D({
-    home: D({ analyst: home }),
+    home: D((function () { var h = {}; h[LX.USER] = home; return h; })()),
     tmp: D({}),
     dev: D({
       'null': F('', { devnull: true }),
@@ -124,18 +126,18 @@ LX.buildFS = function () {
       })()
     }),
     etc: D({
-      hostname: F('lynnux\n'),
+      hostname: F(LX.HOST + '\n'),
       shells: F('# Pathnames of valid login shells.\n/bin/sh\n/bin/bash\n/usr/bin/bash\n/bin/zsh\n/usr/bin/zsh\n'),
-      motd: F('welcome to lynnux. this is a forensic workstation.\nwrite-blocker is ON. evidence stays untouched. have fun.\n'),
-      'os-release': F('NAME="Arch Linux"\nPRETTY_NAME="Arch Linux"\nID=arch\nBUILD_ID=rolling\nVARIANT="lynnux forensic workstation"\nANSI_COLOR="38;2;23;147;209"\nHOME_URL="https://archlinux.org/"\nLOGO=archlinux-logo\n'),
-      passwd: F('root:x:0:0:root:/root:/bin/bash\n' + C.handle + ':x:1000:1000:' + C.handle + ':/home/' + C.handle + ':/usr/bin/zsh\nanalyst:x:1001:1001:guest analyst:/home/analyst:/usr/bin/zsh\nsuspect_47:x:4747:4747:do not trust:/nonexistent:/usr/sbin/nologin\n'),
+      motd: F('welcome to ' + LX.HOST + '. this is a forensic workstation.\nwrite-blocker is ON. evidence stays untouched. have fun.\n'),
+      'os-release': F('NAME="Arch Linux"\nPRETTY_NAME="Arch Linux"\nID=arch\nBUILD_ID=rolling\nVARIANT="forensic workstation"\nANSI_COLOR="38;2;23;147;209"\nHOME_URL="https://archlinux.org/"\nLOGO=archlinux-logo\n'),
+      passwd: F('root:x:0:0:root:/root:/bin/bash\n' + LX.HOST + ':x:1000:1000::/home/' + LX.HOST + ':/usr/bin/zsh\n' + LX.USER + ':x:1001:1001:visitor:' + LX.HOME + ':/usr/bin/zsh\nsuspect_47:x:4747:4747:do not trust:/nonexistent:/usr/sbin/nologin\n'),
       shadow: F('', { denied: true }),
-      'hosts': F('127.0.0.1  localhost\n127.0.1.1  lynnux\n# 198.51.100.23  update.telemetry-cdn.example   <- blocked after case LX-004\n')
+      'hosts': F('127.0.0.1  localhost\n127.0.1.1  ' + LX.HOST + '\n# 198.51.100.23  update.telemetry-cdn.example   <- blocked after case LX-004\n')
     }),
     proc: D({
-      cpuinfo: F('processor\t: 0\nmodel name\t: ' + cpu + '\nflags\t\t: fpu sse4_2 avx2 aes sha_ni forensics write_blocker\nbogomips\t: 5606.40\n'),
+      cpuinfo: F('processor\t: 191\nmodel name\t: ' + cpu + '\ncpu cores\t: 96\nsiblings\t: 192\nflags\t\t: fpu sse4_2 avx2 avx512f aes sha_ni forensics write_blocker\nbogomips\t: 10800.00\n# (processors 0 to 190 omitted, they look the same)\n'),
       meminfo: F('MemTotal:       ' + C.machine.mem + '\nMemFree:        enough\nEvidenceCache:  plenty\n'),
-      version: F('Linux version ' + C.machine.kernel + ' (lynnux) #1 SMP PREEMPT_DYNAMIC\n'),
+      version: F('Linux version ' + C.machine.kernel + ' (' + LX.HOST + ') #1 SMP PREEMPT_DYNAMIC\n'),
       uptime: F(Math.floor(performance.now() / 1000) + '.00 0.00\n')
     }),
     var: D({ log: D({ 'auth.log': { t: 'f', get text() { return LX.authlog.join('\n') + '\n'; } } }) })

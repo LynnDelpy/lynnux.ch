@@ -72,40 +72,41 @@
     var mins = Math.floor((Date.now() - LX.bootTime) / 60000) + 9;
     var up = 420 + ' days, ' + (6 + Math.floor(mins / 60)) + ' hours, ' + (mins % 60) + ' mins';
     var h = new Date().getHours() + new Date().getMinutes() / 60;
-    var coffee = Math.max(0.2, Math.min(4.2, (h - 6) * 0.3));
+    var mate = Math.max(0.2, Math.min(4.2, (h - 6) * 0.3));
     var evBytes = 0, evFiles = 0;
     Object.keys(LX_EVIDENCE.files).forEach(function (k) { LX_EVIDENCE.files[k].forEach(function (f) { evBytes += f.size; evFiles++; }); });
     var n = LX.cases.solvedCount(), t = LX.cases.total(), you = visitorTrace();
     // [key, plain value, optional html value]
     var rows = [
       ['OS', M.os], ['Host', M.host || C.domain + ' (forensic workstation)'], ['Kernel', 'Linux ' + M.kernel], ['Uptime', up],
-      ['Packages', '1337 (pacman), 42 (aur), 0 (snap, never)'], ['Shell', M.shell],
+      ['Packages', '4096 (pacman), 1337 (aur), 0 (snap, never)'], ['Shell', M.shell],
+      M.display ? ['Display', M.display] : null,
       M.de ? ['DE', M.de] : null, M.wm ? ['WM', M.wm] : null, M.theme ? ['Theme', M.theme] : null,
       ['Customized', '100% (0 settings left at default)', bar(100) + span('c-dim', ' 0 settings left at default')],
       M.terminal ? ['Terminal', M.terminal] : null,
       ['CPU', M.cpu], ['GPU', M.gpu],
-      ['Memory', M.mem + ' / ' + M.mem + ' 100% (214 tabs)', M.mem + ' / ' + M.mem + ' ' + bar(100) + span('c-dim', ' 214 tabs')],
-      ['Swap', '100%, not great, not terrible', '8.00 GiB ' + bar(100) + span('c-dim', ' not great, not terrible')],
-      ['Disk (/)', '476.94 GiB 99% btrfs, mostly disk images', '476.94 GiB ' + bar(99) + span('c-dim', ' btrfs, mostly disk images')],
-      ['Battery', '4% [Discharging] (claims 9h left. it lies.)'],
+      ['Memory', M.mem + ' 99% (214 tabs)', M.mem + ' ' + bar(99) + span('c-dim', ' 214 tabs')],
+      ['Swap', M.swap + ' 0% (never touched)', M.swap + ' ' + bar(0) + span('c-dim', ' never touched')],
+      ['Disk (/)', M.disk + ' 96% zfs, all disk images', M.disk + ' ' + bar(96) + span('c-dim', ' zfs, all disk images')],
+      M.power ? ['Power', M.power] : null, M.temp ? ['Temp', M.temp] : null,
       'forensics',
       ['Evidence', t + ' cases · ' + LX.fmtSize(evBytes) + ' in ' + evFiles + ' files · 0 bytes modified'],
-      ['Hashrate', '13.37 GH/s sha256 (on paper)'],
+      ['Hashrate', '1.21 TH/s md5 (hashcat -b, allegedly)'],
       ['Carved', '31,337 files (4,096 were cat pictures)'],
       ['Deleted', 'still not gone (100% of the time)'],
-      ['Coffee', coffee.toFixed(1) + ' / 3.0 L' + (coffee > 3 ? ' (send help)' : ''), coffee.toFixed(1) + ' / 3.0 L ' + bar(coffee / 3 * 100) + (coffee > 3 ? span('c-red', ' send help') : '')],
+      ['Mate', mate.toFixed(1) + ' / 3.0 L' + (mate > 3 ? ' (send help)' : ''), mate.toFixed(1) + ' / 3.0 L ' + bar(mate / 3 * 100) + (mate > 3 ? span('c-red', ' send help') : '')],
       ['Sleep', '3h 41m (ctf weekend)'],
       ['Flags (you)', n + ' / ' + t, n + ' / ' + t + ' ' + bar(n / t * 100)],
       ['Trace (you)', you[0] + you[1], esc(you[0]) + span('c-dim', you[1])]
     ].filter(Boolean);
     if (ctx.piped) { // like the real one: no logo, no colours when piped
-      ctx.out.text(LX.USER + '@lynnux');
+      ctx.out.text(LX.HOST);
       rows.forEach(function (r) { if (Array.isArray(r)) ctx.out.text(r[0] + ': ' + r[1]); });
       return;
     }
     // on phones only the essentials are shown (css hides .ff-x), the rest is for bigger screens
-    var EXTRA = { Host: 1, Shell: 1, WM: 1, Theme: 1, Customized: 1, Terminal: 1, GPU: 1, Swap: 1, 'Disk (/)': 1, Battery: 1, Hashrate: 1, Carved: 1, Deleted: 1, Sleep: 1, 'Trace (you)': 1 };
-    var info = [['<span class="t">' + LX.USER + '</span>@<span class="t">lynnux</span>'], [span('c-faint', '─'.repeat(14))]];
+    var EXTRA = { Host: 1, Shell: 1, Display: 1, WM: 1, Theme: 1, Customized: 1, Terminal: 1, Swap: 1, 'Disk (/)': 1, Power: 1, Temp: 1, Hashrate: 1, Carved: 1, Deleted: 1, Sleep: 1, 'Trace (you)': 1 };
+    var info = [['<span class="t">' + esc(LX.HOST) + '</span>'], [span('c-faint', '─'.repeat(Math.max(5, LX.HOST.length)))]];
     rows.forEach(function (r) {
       if (r === 'forensics') info.push([span('c-faint', '─── ') + span('c-amber', 'forensics') + span('c-faint', ' ' + '─'.repeat(20))]);
       else info.push(['<span class="k">' + esc(r[0]) + '</span>: ' + (r[2] || esc(r[1])), EXTRA[r[0]] ? 'ff-x' : '']);
@@ -226,12 +227,12 @@
       'strings -el finds utf-16le strings. windows loves those.',
       'tshark -r cap.pcap -Y dns -T fields -e dns.qry.name: every dns query, one per line.',
       'xxd -s 0x400 -l 64 file: jump to an offset instead of scrolling through megabytes.',
-      'volatility3: windows.pslist, then windows.cmdline, then windows.netscan. then coffee.',
+      'volatility3: windows.pslist, then windows.cmdline, then windows.netscan. then mate.',
       'plaso / log2timeline builds a super timeline out of everything. then you drown in it, productively.',
       'always sha256sum the evidence before and after. if it changed, you changed it.',
       'a jpeg ends at FF D9. anything after that is someone else\'s story.'
     ],
-    lynn: [
+    me: [
       'forensics is reading a story backwards, from the mess to the cause.',
       'the best challenge makes you feel dumb, then smart, then dumb again.',
       'arch: install it once, configure it forever.',
@@ -239,9 +240,9 @@
       'a good hint teaches a technique. a bad hint just gives the answer.'
     ]
   };
-  def('fortune', { cat: 'fun', help: 'wisdom, tips (real ones), lynn', usage: 'fortune [wisdom|tips|lynn]' }, function (ctx) {
+  def('fortune', { cat: 'fun', help: 'wisdom, tips (real ones), me', usage: 'fortune [wisdom|tips|me]' }, function (ctx) {
     var k = (ctx.args[0] || '').replace(/^-/, '');
-    var pool = FORTUNES[k] || (k ? null : [].concat(FORTUNES.wisdom, FORTUNES.tips, FORTUNES.lynn));
+    var pool = FORTUNES[k] || (k ? null : [].concat(FORTUNES.wisdom, FORTUNES.tips, FORTUNES.me));
     if (!pool) return ctx.out.err('fortune: no such database. try: ' + Object.keys(FORTUNES).join(', '));
     ctx.out.html(span(k === 'tips' ? 'c-cyan' : 'c-amber', pool[Math.floor(Math.random() * pool.length)]));
   });
@@ -353,7 +354,8 @@
   LX.cmds.john = LX.cmds.hashcat;
   gag('vim', span('c-dim', 'vim: the evidence is read-only, and so is this shell. ') + span('c-amber', ':q') + span('c-dim', ' already.'));
   LX.cmds.nano = LX.cmds.vim; LX.cmds.vi = LX.cmds.vim; LX.cmds.emacs = LX.cmds.vim;
-  gag('coffee', span('c-amber', '☕ brewing...') + span('c-dim', ' evidence suggests you have had enough.'));
+  gag('mate', span('c-amber', 'refilling the mate...') + span('c-dim', ' evidence suggests you have had enough.'));
+  gag('coffee', span('c-dim', 'coffee? this box runs on ') + span('c-amber', 'mate') + span('c-dim', '.'));
   gag('pacman', span('c-dim', 'error: you cannot perform this operation unless you are root. (but nice, a fellow arch person)'));
   LX.cmds.paru = LX.cmds.pacman; LX.cmds.yay = LX.cmds.pacman;
   gag('btw', span('c-arch', 'i use arch, btw.'));

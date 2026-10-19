@@ -202,7 +202,7 @@ var LX_CASES = [
     ctx.out.html(' ' + progressBar(n, t, 28) + span('c-dim', '  ' + n + '/' + t));
     if (n === t) {
       ctx.out.text('');
-      ctx.out.html(span('c-amber b glow', 'every case closed. that is a full investigation, analyst.'));
+      ctx.out.html(span('c-amber b glow', 'every case closed. that is a full investigation.'));
       var C = LX_CONFIG, how = C.email ? 'mail me at ' + C.email : C.links.github ? 'find me on ' + C.links.github : 'let me know';
       ctx.out.html(span('c-dim', 'if you enjoyed this, ' + how + '. i would love to hear which one took you the longest.'));
     } else if (id === '007') {
