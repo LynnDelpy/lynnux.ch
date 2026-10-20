@@ -53,7 +53,7 @@ LX.buildFS = function () {
     '  cases            overview + your progress\n' +
     '  cat BRIEFING.txt read the case file\n' +
     '  hint <case>      when you are stuck\n' +
-    '  submit <flag>    flags look like lynnux{...}\n\n' +
+    '  submit <flag>    flags look like ' + LX_CONFIG.flagPrefix + '{...}\n\n' +
     'the evidence is write-blocked (read-only). tools that produce files\n' +
     'drop them into ~/work instead. every file can be downloaded too:\n' +
     '  download <file>  then use your own tools (exiftool, binwalk, wireshark, ...)\n', { ro: true }) };
@@ -110,7 +110,7 @@ LX.buildFS = function () {
     }) }) }),
     '.config': D({
       'hyfetch.json': F(JSON.stringify({
-        preset: 'lesbian', mode: 'rgb', light_dark: 'dark', lightness: 0.65,
+        preset: C.hyfetchPreset, mode: 'rgb', light_dark: 'dark', lightness: 0.65,
         color_align: { mode: 'horizontal', custom_colors: [], fore_back: null },
         backend: 'fastfetch', args: null, distro: null, pride_month_shown: [], pride_month_disable: false
       }, null, 2) + '\n'),
@@ -125,7 +125,7 @@ LX.buildFS = function () {
     Object.keys(LX.cmds).sort().forEach(function (k) {
       var c = LX.cmds[k];
       if (c.hidden) return;
-      var txt = new TextEncoder().encode('\0lynnux ' + k + '\0usage: ' + c.usage + '\0' + c.help + '\0GCC: (GNU) 15.2.1\0');
+      var txt = new TextEncoder().encode('\0' + C.siteName + ' ' + k + '\0usage: ' + c.usage + '\0' + c.help + '\0GCC: (GNU) 15.2.1\0');
       var b = new Uint8Array(hdr.length + 40 + txt.length);
       b.set(hdr); b.set(txt, hdr.length + 40);
       d[k] = { t: 'b', data: b, ro: true };

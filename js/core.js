@@ -2,6 +2,7 @@
 // virtual fs, tokenizer (quotes, pipes, ; && ||, > >>, globs, $VARS),
 // async commands, history, tab completion, overlays.
 'use strict';
+// LX_CONFIG.domain / .host are set by domain.js (the domain this visitor connected to)
 
 var LX = {
   cmds: Object.create(null),
@@ -43,8 +44,8 @@ LX.$ = function (id) { return document.getElementById(id); };
 LX._parser = new DOMParser();
 LX.strip = function (html) { return LX._parser.parseFromString('<body>' + html, 'text/html').body.textContent; };
 LX.store = {
-  get: function (k, d) { try { var v = localStorage.getItem('lynnux.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
-  set: function (k, v) { try { localStorage.setItem('lynnux.' + k, JSON.stringify(v)); } catch (e) { /* private mode, fine */ } }
+  get: function (k, d) { try { var v = localStorage.getItem(LX_CONFIG.siteName + '.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set: function (k, v) { try { localStorage.setItem(LX_CONFIG.siteName + '.' + k, JSON.stringify(v)); } catch (e) { /* private mode, fine */ } }
 };
 
 // tiny getopt. spec = { flags: 'la', vals: 'nsl' } -> { f: {l:true}, v: {n:'8'}, rest: [] }

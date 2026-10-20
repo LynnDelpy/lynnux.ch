@@ -9,7 +9,8 @@ inspired by [lumiingenii.ch](https://lumiingenii.ch), go play their snake.
 ## what's in here
 
 - **a login popup**: visitors pick a name (or skip as guest) and become
-  `name@lynnux.ch`. the name only lives in their browser. `logout` to switch.
+  `name@lynnux.ch` or `name@lynnux.li`, whichever domain they typed. the name
+  only lives in their browser. `logout` to switch.
 - **a terminal** (zsh flavoured: syntax highlighting, autosuggestions) with pipes, `;` `&&` `||`, `>` `>>` (binary safe), globs, `$VARS`,
   tab completion and history. click anything underlined.
 - **in-browser forensics tools** that work on the actual bytes:
@@ -53,8 +54,56 @@ need that.
 
 ## make it yours
 
-everything personal is in **`js/config.js`**: links, email, about text,
-fastfetch info, writeups. anything set to `null` is hidden.
+everything personal lives in **`site.env`**, one commented file: site name,
+domains, owner, flag prefix, links, about text, the hyfetch flag and the
+(stupid) fastfetch stats. it's plain `KEY=value`, every key is explained in
+the file itself, and an empty value hides that thing on the site.
+
+```sh
+$EDITOR site.env
+python3 tools/build.py            # site.env -> js/config.js, page titles, meta tags, CNAME
+python3 tools/build.py --check    # only check that everything is in sync (exit 1 if not)
+```
+
+`build.py` is plain python 3, no pip installs. it validates everything before
+writing anything (domains, a unix username for `OWNER`, http(s) only links, a
+known hyfetch preset, ...) and warns about typo'd keys, so a broken `site.env`
+fails loudly instead of shipping a broken site.
+
+**`site.env` is public.** it gets committed and deployed, like every other
+file in here. no secrets, no tokens, ever.
+
+### forking it for your own site
+
+1. fork the repo
+2. edit `site.env` (at least `SITE_NAME`, `DOMAINS`, `OWNER`, `FLAG_PREFIX`,
+   the links and `ABOUT`)
+3. `python3 tools/build.py`
+4. `python3 tools/build_evidence.py --new` (see below). this rolls **your own
+   flags** with your `FLAG_PREFIX`. without it the evidence still has mine,
+   and you don't know them
+5. commit (`flags.json` stays local, it's gitignored) and deploy
+
+### more than one domain
+
+list them all in `DOMAINS`, comma separated. the site looks at the hostname
+the visitor typed and uses the matching one: prompt, caution tape, page title,
+`hostname`, `ping`, the man pages and the 404 page all follow it.
+
+| visitor typed      | site calls itself |
+|--------------------|-------------------|
+| `lynnux.ch`        | `lynnux.ch`       |
+| `lynnux.li`        | `lynnux.li`       |
+| `www.lynnux.li`    | `lynnux.li` (subdomains count as their base domain) |
+| anything else      | the first one in `DOMAINS` (localhost, `*.pages.dev` previews) |
+
+`{domain}` inside any value in `site.env` gets the same treatment, so
+`EMAIL=hi@{domain}` shows `hi@lynnux.li` to people on `.li`.
+
+heads up: browsers keep storage **per origin**. solved cases and the login name
+on `lynnux.ch` are not visible on `lynnux.li` (or on `www.` vs no `www.`). that
+is the browser's security model, not a bug. redirecting `www` to the bare
+domain keeps it to one origin per domain.
 
 ## (re)building the evidence
 
@@ -70,8 +119,8 @@ exist it creates one.
 ## adding a case
 
 1. add a `case_008(flag)` function to `tools/build_evidence.py` that writes
-   into `evidence/case-008/`, add a template to `FLAG_TEMPLATES`, call it in
-   `main()`.
+   into `evidence/case-008/`, add the flag body to `FLAG_BODIES` (the prefix
+   comes from `site.env`), call it in `main()`.
 2. run the builder.
 3. add an entry to `LX_CASES` in `js/cases.js` (title, briefing, hints).
 
@@ -79,26 +128,50 @@ that's it, the folder, briefing, downloads and plain view all build themselves.
 
 ## deploying
 
-static files, no build step. two good options:
+static files. the generated files are committed, so anything that serves a
+folder works. but only one of the two options can serve **both** domains.
 
-- **cloudflare pages** (recommended): connect the repo, no build command,
-  output dir `/`. it reads `_headers`, so you get the full security headers.
-  works with private repos too.
-- **github pages**: settings > pages > deploy from branch `main`, folder `/`.
-  `_headers` is ignored there but the `<meta>` CSP still applies.
+### cloudflare pages (recommended, and needed for .ch + .li)
 
-### custom domain (once lynnux.ch is bought)
+1. workers & pages > create > pages > connect the repo
+2. build command: `python3 tools/build.py`, output directory: `/`
+   (the build image has python 3. this way an edit to `site.env` straight on
+   github still deploys correctly, even if nobody ran the build locally)
+3. custom domains > add `lynnux.ch`, `www.lynnux.ch`, `lynnux.li`, `www.lynnux.li`.
+   pages wants each hostname added on its own, no wildcards. the domains need
+   their DNS on cloudflare for the bare (apex) names to work
+4. optional: a redirect rule `www.*` -> bare domain (see the storage note above)
 
-- github pages: settings > pages > custom domain `lynnux.ch` (this creates
-  the `CNAME` file for you), then point the DNS at github.
-- cloudflare pages: custom domains > add `lynnux.ch`.
+it reads `_headers`, so you get the full security headers (CSP, no framing,
+no referrer). works with private repos too.
+
+**never** put `tools/build_evidence.py` in the build command. it needs
+`flags.json`, which is private and not in the repo. without it, it would roll
+random flags nobody knows and overwrite the evidence.
+
+### github pages (one domain only)
+
+settings > pages > deploy from branch, folder `/`. github pages allows exactly
+**one** custom domain per site: set `CNAME=lynnux.ch` in `site.env` and run the
+build, it writes the `CNAME` file. the other domain can only redirect there, so
+`.li` visitors end up on `.ch`. `_headers` is ignored, the `<meta>` CSP still
+applies.
+
+### ci
+
+`.github/workflows/check.yml` runs `python3 tools/build.py --check` on every
+push and pull request. if someone edits `site.env` and forgets the build, it
+goes red instead of silently deploying old values (on github pages).
 
 ## layout
 
 ```
+site.env              <- your stuff. edit this, then run tools/build.py
 index.html            the page
+404.html              the not-found page
 css/style.css         all styling
-js/config.js          <- your stuff
+js/config.js          generated from site.env, don't edit
+js/domain.js          picks the domain the visitor is on, fills {domain}
 js/core.js            shell engine: fs, tokenizer, pipes, redirects
 js/fsdata.js          what's on the virtual disk
 js/commands.js        ls, cd, cat, grep, cut, tr, sort, ...
@@ -113,6 +186,8 @@ js/gui.js             the plain view panel
 js/boot.js            boot sequence
 js/evidence.gen.js    generated: flag hashes + evidence file hashes
 evidence/             generated challenge files
+tools/build.py        site.env -> config.js + html
+tools/siteenv.py      the site.env parser (shared by both builders)
 tools/build_evidence.py
 ```
 

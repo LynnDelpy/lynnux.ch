@@ -122,7 +122,7 @@ var LX_CASES = [
       L.push('');
       L.push(' might help     : ' + c.tools);
       L.push(' stuck?         : hint ' + c.id);
-      L.push(' flag format    : lynnux{...}   then: submit lynnux{...}');
+      L.push(' flag format    : ' + LX_CONFIG.flagPrefix + '{...}   then: submit ' + LX_CONFIG.flagPrefix + '{...}');
       return L.join('\n') + '\n';
     },
     // returns the case id for a correct flag, or null
@@ -178,12 +178,12 @@ var LX_CASES = [
     if (want < c.hints.length) ctx.out.text('(run it again for a bigger nudge)', 'c-dim');
   });
 
-  def('submit', { cat: 'cases', help: 'submit a flag. checked by hash, it never leaves your browser', usage: 'submit lynnux{...}' }, async function (ctx) {
+  def('submit', { cat: 'cases', help: 'submit a flag. checked by hash, it never leaves your browser', usage: 'submit ' + LX_CONFIG.flagPrefix + '{...}' }, async function (ctx) {
     var flag = ctx.args.join('');
     if (!flag && ctx.stdin) flag = ctx.stdin.trim();
-    if (!flag) return ctx.out.err('submit: usage: submit lynnux{...}');
-    if (!/^lynnux\{.+\}$/i.test(flag.trim())) {
-      ctx.out.err('submit: flags look like lynnux{...}');
+    if (!flag) return ctx.out.err('submit: usage: submit ' + LX_CONFIG.flagPrefix + '{...}');
+    if (!new RegExp('^' + LX_CONFIG.flagPrefix + '\\{.+\\}$', 'i').test(flag.trim())) {
+      ctx.out.err('submit: flags look like ' + LX_CONFIG.flagPrefix + '{...}');
       return 1;
     }
     var id = await LX.cases.check(flag);

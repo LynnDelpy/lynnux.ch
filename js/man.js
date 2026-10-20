@@ -9,11 +9,11 @@
   // ex: [[command, what it does]], notes: forensics notes, see: other pages. s: section (default 1)
   var M = LX.MAN = {
     // ---- section 7: concepts
-    lynnux: { s: 7, d: 'what this machine is and how to use it',
-      desc: 'lynnux.ch is a forensic workstation that runs in your browser. it is a portfolio, a playground and a set of real forensics challenges at the same time.\n\n' +
+    intro: { s: 7, d: 'what this machine is and how to use it',
+      desc: LX_CONFIG.domain + ' is a forensic workstation that runs in your browser. it is a portfolio, a playground and a set of real forensics challenges at the same time.\n\n' +
         'everything lives in a virtual file system. ~/cases holds the evidence: real files, generated for these challenges. the tools (`exiftool`, `binwalk`, `tcpdump`, `fls`, ...) work on the actual bytes, so what you learn here works on a real machine too.\n\n' +
         'the evidence is write-blocked: ~/cases is read-only, and tools that produce files write them to ~/work instead. that is how real investigations work: never touch the original.\n\n' +
-        'flags look like `lynnux{...}`. `submit` checks them by hash, so the flags are not in the source code. they only exist inside the evidence.',
+        'flags look like `' + LX_CONFIG.flagPrefix + '{...}`. `submit` checks them by hash, so the flags are not in the source code. they only exist inside the evidence.',
       ex: [['cases', 'list the cases and your progress'], ['cat ~/cases/case-001/BRIEFING.txt', 'read a case file'], ['help', 'every command, grouped'], ['apropos carve', 'find commands by keyword']],
       see: ['forensics', 'hier', 'cases', 'zsh'] },
     forensics: { s: 7, d: 'a tiny primer on digital forensics',
@@ -24,10 +24,10 @@
         'FILE SYSTEM VS CARVING. a file system knows names, times and where data lives (`fls`, `icat`). when it is damaged or the file was deleted, carving finds files by their magic bytes alone (`foremost`, `binwalk`), but loses names and times.\n\n' +
         'METADATA. files carry more than their content: EXIF in photos (`exiftool`), MAC times in the file system (`stat`), timestamps in shell history (~/.zsh_history), logs (/var/log/auth.log).\n\n' +
         'HIDDEN DATA. steganography hides data inside other data: bit planes (`stegsolve`), spectrograms (`spectrogram`), trailing bytes (`binwalk`), zero width characters (`xxd`). high `entropy` is a hint something is compressed or encrypted.',
-      see: ['lynnux', 'stat', 'foremost', 'fls', 'entropy'] },
+      see: ['intro', 'stat', 'foremost', 'fls', 'entropy'] },
     hier: { s: 7, d: 'the layout of this file system',
       desc: '/home/<you>                 your home. writable.\n~/cases                     the evidence locker. read-only (write-blocked).\n~/work                      scratch space. tools write here when the cwd is read-only.\n~/.zsh_history              your shell history, with timestamps.\n~/.zshrc                    shell config. it ends with `hyfetch`.\n~/.config                   hyfetch and fastfetch configs.\n~/.local/share/Trash        things someone deleted. (forensics people look here.)\n/dev                        null, zero, urandom, and sdb: the suspect usb stick.\n/etc                        hostname, passwd, os-release, motd, shells.\n/proc                       cpuinfo, meminfo, version, uptime.\n/var/log/auth.log           logins, failed logins, sudo attempts. yours too.\n/usr/bin                    every command on this machine.\n/lost+found                 what fsck found. take a look.',
-      see: ['lynnux', 'ls', 'tree'] },
+      see: ['intro', 'ls', 'tree'] },
     zsh: { d: 'the z shell, as configured on this machine',
       syn: 'zsh',
       desc: 'the shell here behaves like a configured zsh: pipes, `;` `&&` `||`, redirects (`>` `>>`, binary safe), globs (`*`, `?` in any path segment), `$VARS` and quoting.\n\n' +
@@ -36,7 +36,7 @@
         'history is saved to ~/.zsh_history in EXTENDED_HISTORY format (`: <epoch>:<duration>;<command>`). HIST_IGNORE_SPACE is set: start a command with a space and it never gets saved.',
       opts: [['$?', 'exit status of the last pipeline'], ['$HOME $USER $PWD $SHELL', 'the usual'], ['ctrl+c', 'cancel the running command'], ['ctrl+l', 'clear the screen'], ['ctrl+u', 'clear the line'], ['tab', 'complete commands and paths']],
       ex: [['grep -c sudo ~/.zsh_history', 'count your own sudo attempts'], ['cmd; echo $?', 'see how cmd exited'], [' echo secret', 'leading space: stays out of history']],
-      see: ['history', 'alias', 'lynnux'] },
+      see: ['history', 'alias', 'intro'] },
 
     // ---- start here
     help: { d: 'list commands, or summarize one', syn: 'help [command]', desc: 'without arguments, prints every command grouped by what it is for. with a command, prints its summary and synopsis.', see: ['man', 'apropos', 'tldr'] },
@@ -87,7 +87,7 @@
     cut: { d: 'cut out fields or characters', syn: ['cut -d DELIM -f LIST [file]', 'cut -c LIST [file]'], desc: 'LIST is like 1,3 or 2-4 or 3-.', ex: [['cut -d: -f1 /etc/passwd', 'all user names']], see: ['awk', 'tr'] },
     tr: { d: 'translate or delete characters', syn: 'tr [-ds] set1 [set2]', desc: 'sets support ranges like a-z and classes like [:upper:].', ex: [["tr -d '\\n'", 'join lines'], ['tr a-z A-Z', 'shout']], see: ['sed', 'cut'] },
     sed: { d: 'stream editor', syn: ["sed [-n] 's/regex/replacement/[gip]' [file]", "sed '/regex/d'", "sed -n '/regex/p'", "sed 'Nd' | 'Np' | 'Nq'"],
-      desc: 'a small sed. regexes are JavaScript flavour (think sed -E). in the replacement, & is the match and \\1 a group.', ex: [["sed 's/lynnux/LYNNUX/g' ~/about.txt", 'replace'], ["sed -n '2p' file", 'print line 2']], see: ['awk', 'tr', 'grep'] },
+      desc: 'a small sed. regexes are JavaScript flavour (think sed -E). in the replacement, & is the match and \\1 a group.', ex: [["sed 's/arch/ARCH/g' ~/about.txt", 'replace'], ["sed -n '2p' file", 'print line 2']], see: ['awk', 'tr', 'grep'] },
     awk: { d: 'pattern scanning, mostly for printing columns', syn: "awk [-F sep] '[/regex/] {print $1, $NF}' [file]",
       desc: 'a small awk. knows {print ...} with $0, $1..$N, $NF, NF, NR and "strings", optionally guarded by /regex/.', ex: [["awk '{print $3}'", 'third column'], ["awk -F: '{print $1, $7}' /etc/passwd", 'users and shells']], see: ['cut', 'sed'] },
     jq: { d: 'command line json processor', syn: 'jq [-rc] [.path] [file]', desc: 'a small jq: ., .a.b, .a[0], .[], keys, length.', opts: [['-r', 'raw strings, no quotes'], ['-c', 'compact']], ex: [['jq .preset ~/.config/hyfetch.json', 'which flag does hyfetch use?']], see: ['hyfetch'] },
@@ -188,9 +188,9 @@
     mmls: { d: 'partition layout of a disk image', syn: 'mmls image', see: ['fsstat'] },
 
     // ---- cases
-    cases: { d: 'the evidence locker: every case and your progress', syn: 'cases', desc: 'lists the cases. click one to open its briefing. progress is stored in your browser.', see: ['hint', 'submit', 'lynnux'] },
+    cases: { d: 'the evidence locker: every case and your progress', syn: 'cases', desc: 'lists the cases. click one to open its briefing. progress is stored in your browser.', see: ['hint', 'submit', 'intro'] },
     hint: { d: 'a nudge for a case', syn: 'hint [case] [1|2]', desc: 'each case has two hints, from gentle to blunt. run it twice for the second. inside a case folder the case number is optional.', see: ['cases'] },
-    submit: { d: 'submit a flag', syn: 'submit lynnux{...}', desc: 'flags are checked by comparing sha256 hashes, locally. your guess never leaves the browser and the real flags are not in the source.', see: ['cases'] },
+    submit: { d: 'submit a flag', syn: 'submit ' + LX_CONFIG.flagPrefix + '{...}', desc: 'flags are checked by comparing sha256 hashes, locally. your guess never leaves the browser and the real flags are not in the source.', see: ['cases'] },
 
     // ---- system
     history: { d: 'your shell history', syn: 'history [-i] [-c]', opts: [['-i', 'with timestamps'], ['-c', 'clear the session history']], notes: 'shell history is evidence. it is also in ~/.zsh_history, with unix timestamps.', see: ['zsh', 'last'] },
@@ -228,7 +228,7 @@
     enhance: { d: 'the crime tv move', syn: 'enhance' },
     pride: { d: 'every flag hyfetch knows', syn: 'pride', see: ['hyfetch'] }
   };
-  M.more = M.less; M.top = M.htop; M.ifconfig = M.ip; M.exit = M.logout; M.ent = M.entropy; M.intro = M.lynnux;
+  M.more = M.less; M.top = M.htop; M.ifconfig = M.ip; M.exit = M.logout; M.ent = M.entropy; M[LX_CONFIG.siteName] = M.intro;
 
   // ------------------------------------------------------------ rendering
   function pageFor(name) {
@@ -243,7 +243,7 @@
 
   function renderHTML(name, p) {
     var t = title(name, p), h = '<div class="man">';
-    h += '<div class="man-hf"><span>' + esc(t) + '</span><span>lynnux manual</span><span>' + esc(t) + '</span></div>';
+    h += '<div class="man-hf"><span>' + esc(t) + '</span><span>' + esc(LX_CONFIG.siteName) + ' manual</span><span>' + esc(t) + '</span></div>';
     var sec = function (head, body) { h += '<h3>' + head + '</h3><div class="man-b">' + body + '</div>'; };
     sec('NAME', '<b>' + esc(name) + '</b> - ' + inline(p.d));
     if (p.syn) sec('SYNOPSIS', asArr(p.syn).map(function (s) { var i = s.indexOf(' '); return '<div><b>' + esc(i < 0 ? s : s.slice(0, i)) + '</b>' + esc(i < 0 ? '' : s.slice(i)) + '</div>'; }).join(''));
@@ -253,7 +253,7 @@
     if (p.ex) sec('EXAMPLES', p.ex.map(function (e) { return '<div class="man-ex"><code data-run="' + esc(e[0]) + '">' + esc(e[0]) + '</code><div>' + inline(e[1]) + '</div></div>'; }).join(''));
     if (p.notes) sec('FORENSICS NOTES', '<p>' + inline(p.notes) + '</p>');
     if (p.see) sec('SEE ALSO', p.see.map(function (s) { var sp = pageFor(s); return '<span class="man-see" data-man="' + esc(s) + '">' + esc(s) + '(' + ((sp && sp.s) || 1) + ')</span>'; }).join(', '));
-    h += '<div class="man-hf"><span>lynnux.ch</span><span>' + new Date().getFullYear() + '</span><span>' + esc(t) + '</span></div></div>';
+    h += '<div class="man-hf"><span>' + esc(LX_CONFIG.domain) + '</span><span>' + new Date().getFullYear() + '</span><span>' + esc(t) + '</span></div></div>';
     return h;
   }
   // plain text, for `man x | grep ...`
@@ -267,7 +267,7 @@
     return out.join('\n');
   }
   function renderText(name, p) {
-    var t = title(name, p), L = [t + ' '.repeat(Math.max(1, 30 - t.length)) + 'lynnux manual' + ' '.repeat(Math.max(1, 30 - t.length)) + t, ''];
+    var t = title(name, p), L = [t + ' '.repeat(Math.max(1, 30 - t.length)) + LX_CONFIG.siteName + ' manual' + ' '.repeat(Math.max(1, 30 - t.length)) + t, ''];
     var sec = function (head, body) { L.push(head, body, ''); };
     var plain = function (s) { return s.replace(/`/g, ''); };
     sec('NAME', '       ' + name + ' - ' + plain(p.d));
@@ -277,7 +277,7 @@
     if (p.ex) sec('EXAMPLES', p.ex.map(function (e) { return '       ' + e[0] + '\n' + wrap(plain(e[1]), 11, 78); }).join('\n'));
     if (p.notes) sec('FORENSICS NOTES', wrap(plain(p.notes), 7, 78));
     if (p.see) sec('SEE ALSO', '       ' + p.see.map(function (s) { var sp = pageFor(s); return s + '(' + ((sp && sp.s) || 1) + ')'; }).join(', '));
-    L.push('lynnux.ch' + ' '.repeat(28) + new Date().getFullYear() + ' '.repeat(28) + t);
+    L.push(LX_CONFIG.domain + ' '.repeat(28) + new Date().getFullYear() + ' '.repeat(28) + t);
     return L.join('\n');
   }
 
@@ -351,7 +351,7 @@
     return LX.pager(ctx, { title: 'man ' + r.name, label: 'Manual page ' + r.name + '(' + (r.p.s || 1) + ')', html: renderHTML(r.name, r.p) });
   });
   function allPages() {
-    var dup = ['more', 'top', 'ifconfig', 'exit', 'ent', 'intro'];
+    var dup = ['more', 'top', 'ifconfig', 'exit', 'ent', LX_CONFIG.siteName];
     var names = Object.keys(M).filter(function (k) { return dup.indexOf(k) < 0; });
     Object.keys(LX.cmds).forEach(function (k) { if (!LX.cmds[k].hidden && names.indexOf(k) < 0) names.push(k); });
     return names.sort();

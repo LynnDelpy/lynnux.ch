@@ -352,7 +352,7 @@
       if (!LX.fs.get(LX.HOME + '/work')) LX.fs.put(LX.HOME + '/work', LX.D({}));
       LX.fs.put(outDir, LX.D({}));
     } catch (e) { return ctx.out.err('foremost: ' + e.message); }
-    var counts = {}, audit = ['Foremost version 1.5.7 (lynnux build)', 'Audit File', '', 'Invocation: foremost ' + ctx.args.join(' '), 'Output directory: ' + LX.fs.display(outDir), 'Input file: ' + path, '', 'Num\t Name (bs=512)\t       Size\t File Offset'];
+    var counts = {}, audit = ['Foremost version 1.5.7 (' + LX_CONFIG.siteName + ' build)', 'Audit File', '', 'Invocation: foremost ' + ctx.args.join(' '), 'Output directory: ' + LX.fs.display(outDir), 'Input file: ' + path, '', 'Num\t Name (bs=512)\t       Size\t File Offset'];
     found.forEach(function (x, i) {
       var name = String(Math.floor(x[1] / 512)).padStart(8, '0') + '.' + x[0];
       if (!LX.fs.get(outDir + '/' + x[0])) LX.fs.put(outDir + '/' + x[0], LX.D({}));
@@ -601,7 +601,8 @@
   def('ping', { cat: 'system', help: 'ping. only localhost answers', usage: 'ping <host>' }, async function (ctx) {
     var h = ctx.args.filter(function (a) { return a[0] !== '-'; })[0] || '';
     if (!h) return ctx.out.err('ping: usage error: Destination address required');
-    if (!/^(localhost|127(\.\d+){3}|::1|lynnux(\.ch)?)$/.test(h)) { ctx.out.err('ping: connect: Network is unreachable'); ctx.out.text('(air-gapped. that is the point of a forensic workstation.)', 'c-dim'); return 2; }
+    var self = ['localhost', '::1', LX.HOST, LX_CONFIG.siteName].concat(LX_CONFIG.domains);
+    if (self.indexOf(h) < 0 && !/^127(\.\d+){3}$/.test(h)) { ctx.out.err('ping: connect: Network is unreachable'); ctx.out.text('(air-gapped. that is the point of a forensic workstation.)', 'c-dim'); return 2; }
     ctx.out.text('PING ' + h + ' (127.0.0.1) 56(84) bytes of data.');
     for (var i = 1; i <= 4; i++) { await ctx.sleep(380); ctx.out.text('64 bytes from 127.0.0.1: icmp_seq=' + i + ' ttl=64 time=0.0' + (31 + i * 7 % 40) + ' ms'); }
     ctx.out.text('\n--- ' + h + ' ping statistics ---\n4 packets transmitted, 4 received, 0% packet loss, time 3004ms');
@@ -717,7 +718,7 @@
     var up = ((Date.now() - LX.bootTime) / 1000 + 4242).toFixed(6), L = [
       'sysrq: Trigger a crash', 'Kernel panic - not syncing: sysrq triggered crash',
       'CPU: 137 UID: 1001 PID: 6001 Comm: zsh Tainted: P           O       ' + LX_CONFIG.machine.kernel + ' #1',
-      'Hardware name: ' + (LX_CONFIG.machine.host || 'lynnux'), 'Call Trace:', ' <TASK>', ' dump_stack_lvl+0x5d/0x80', ' panic+0x118/0x2f0', ' sysrq_handle_crash+0x1a/0x20',
+      'Hardware name: ' + (LX_CONFIG.machine.host || LX.HOST), 'Call Trace:', ' <TASK>', ' dump_stack_lvl+0x5d/0x80', ' panic+0x118/0x2f0', ' sysrq_handle_crash+0x1a/0x20',
       ' __handle_sysrq.cold+0x4c/0x118', ' write_sysrq_trigger+0x5f/0x80', ' proc_reg_write+0x5a/0xa0', ' vfs_write+0xf5/0x430', ' ksys_write+0x6f/0xf0',
       ' do_syscall_64+0x82/0x190', ' entry_SYSCALL_64_after_hwframe+0x76/0x7e', ' </TASK>', 'Kernel Offset: 0x1337000 from 0xffffffff81000000',
       '---[ end Kernel panic - not syncing: sysrq triggered crash ]---'];

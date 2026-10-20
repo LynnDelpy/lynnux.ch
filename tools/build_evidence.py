@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-build_evidence.py - generates every challenge artifact for lynnux.ch
+build_evidence.py - generates every challenge artifact (flag prefix from site.env)
 
     python3 tools/build_evidence.py            # build with flags from flags.json
     python3 tools/build_evidence.py --new      # roll fresh flags (new random suffixes)
@@ -22,16 +22,22 @@ EVID = os.path.join(ROOT, 'evidence')
 FLAGS_PATH = os.path.join(ROOT, 'flags.json')
 GEN_JS = os.path.join(ROOT, 'js', 'evidence.gen.js')
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from siteenv import load as load_env  # noqa: E402
+
+# the flag prefix comes from site.env (FLAG_PREFIX), so a fork gets its own flags
+FLAG_PREFIX = load_env().get('FLAG_PREFIX', '').strip() or 'flag'
+
 # flag bodies. a random 4 hex suffix gets appended so nobody can guess them.
 # visual flags (002, 005, 006) avoid 0/o and 1/l lookalikes on purpose.
-FLAG_TEMPLATES = {
-    '001': 'lynnux{3x1f_n3v3r_f0rg3ts_%s}',
-    '002': 'lynnux{bit_planes_tell_tales_%s}',
-    '003': 'lynnux{c4rv3d_r1ght_0ut_0f_th3_jp3g_%s}',
-    '004': 'lynnux{dns_tunn3ls_l34v3_crumbs_%s}',
-    '005': 'lynnux{deleted_is_not_gone_%s}',
-    '006': 'lynnux{look_at_the_sound_%s}',
-    '007': 'lynnux{z3r0_w1dth_but_n0t_z3r0_1nf0_%s}',
+FLAG_BODIES = {
+    '001': '3x1f_n3v3r_f0rg3ts_%s',
+    '002': 'bit_planes_tell_tales_%s',
+    '003': 'c4rv3d_r1ght_0ut_0f_th3_jp3g_%s',
+    '004': 'dns_tunn3ls_l34v3_crumbs_%s',
+    '005': 'deleted_is_not_gone_%s',
+    '006': 'look_at_the_sound_%s',
+    '007': 'z3r0_w1dth_but_n0t_z3r0_1nf0_%s',
 }
 HEX_SAFE = '23456789abcdef'  # no 0/1, so visual flags stay readable
 
@@ -42,9 +48,12 @@ def load_flags(new=False):
         with open(FLAGS_PATH) as f:
             flags = json.load(f)
     changed = False
-    for k, tpl in FLAG_TEMPLATES.items():
-        if k not in flags:
-            flags[k] = tpl % ''.join(secrets.choice(HEX_SAFE) for _ in range(4))
+    for k, body in FLAG_BODIES.items():
+        # missing, or made with another FLAG_PREFIX: roll a fresh one
+        if k not in flags or not flags[k].startswith(FLAG_PREFIX + '{'):
+            if k in flags:
+                print('[*] flag %s used another prefix, rolling a new %s{...} one' % (k, FLAG_PREFIX))
+            flags[k] = FLAG_PREFIX + '{' + body % ''.join(secrets.choice(HEX_SAFE) for _ in range(4)) + '}'
             changed = True
     if changed:
         with open(FLAGS_PATH, 'w') as f:

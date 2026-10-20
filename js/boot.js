@@ -5,6 +5,7 @@
   var esc = LX.esc, span = LX.span;
   LX.bootTime = new Date();
   document.querySelector('.st-badge').textContent = LX.HOST;
+  document.title = LX.HOST;
 
   // ---- caution tape. two identical halves so the loop is seamless
   var unit = ['EVIDENCE', 'DO NOT CROSS', LX_CONFIG.domain.toUpperCase(), 'FORENSIC WORKSTATION', 'WRITE-BLOCKER ON', 'CASE FILES INSIDE'];

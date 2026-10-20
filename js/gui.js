@@ -37,7 +37,7 @@
     var msg = el('div', 'msg');
     if (!solved) {
       var form = el('div', 'row'), inp = el('input'), sb = el('button', 'btn', 'submit');
-      inp.placeholder = 'lynnux{...}'; inp.setAttribute('aria-label', 'flag for case ' + c.id); inp.spellcheck = false; inp.autocomplete = 'off';
+      inp.placeholder = LX_CONFIG.flagPrefix + '{...}'; inp.setAttribute('aria-label', 'flag for case ' + c.id); inp.spellcheck = false; inp.autocomplete = 'off';
       sb.type = 'button';
       async function go() {
         var v = inp.value.trim();
@@ -62,7 +62,7 @@
     render: function () {
       var C = LX_CONFIG;
       panel.textContent = '';
-      panel.appendChild(el('div', 'who', C.host === C.domain ? C.domain : C.host + ' · ' + C.domain));
+      panel.appendChild(el('div', 'who', C.domain));
       panel.appendChild(el('div', 'tag', C.tagline));
       var about = C.about.join('\n').split('\n\n');
       about.slice(0, 2).forEach(function (p) { var e = el('p', 'c-dim', p.replace(/\n/g, ' ')); e.style.marginTop = '8px'; panel.appendChild(e); });

@@ -278,7 +278,7 @@
     if (!f) return;
     var b = await LX.fs.bytes(f.node), mt = LX.magic(b);
     var type = /^JPEG/.test(mt) ? ['JPEG', 'image/jpeg'] : /^PNG/.test(mt) ? ['PNG', 'image/png'] : /WAVE/.test(mt) ? ['WAV', 'audio/x-wav'] : /^pcap/.test(mt) ? ['PCAP', 'application/vnd.tcpdump.pcap'] : /boot sector/.test(mt) ? ['FAT', 'application/octet-stream'] : /text/.test(mt) ? ['TXT', 'text/plain'] : ['', 'application/octet-stream'];
-    var rows = [['ExifTool Version Number', '12.76 (lynnux build)'], ['File Name', f.name], ['File Size', b.length < 1000 ? b.length + ' bytes' : b.length < 1e6 ? Math.round(b.length / 1000) + ' kB' : (b.length / 1e6).toFixed(1) + ' MB'], ['File Type', type[0] || 'Unknown'], ['MIME Type', type[1]]];
+    var rows = [['ExifTool Version Number', '12.76 (' + LX_CONFIG.siteName + ' build)'], ['File Name', f.name], ['File Size', b.length < 1000 ? b.length + ' bytes' : b.length < 1e6 ? Math.round(b.length / 1000) + ' kB' : (b.length / 1e6).toFixed(1) + ' MB'], ['File Type', type[0] || 'Unknown'], ['MIME Type', type[1]]];
     var meta = await exif(b);
     var all = rows.concat(meta);
     all.forEach(function (r) {
