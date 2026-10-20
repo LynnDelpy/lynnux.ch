@@ -2,6 +2,9 @@
 flags.json
 SOLUTIONS.md
 
+# build output (python3 tools/build.py --dist)
+dist/
+
 __pycache__/
 .DS_Store
 node_modules/

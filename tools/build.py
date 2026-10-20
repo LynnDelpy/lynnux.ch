@@ -4,11 +4,13 @@ build.py - turns site.env into the files the site reads.
 
     python3 tools/build.py           # write js/config.js, update index.html / 404.html, CNAME
     python3 tools/build.py --check   # only check that everything is up to date (for CI)
+    python3 tools/build.py --dist    # build, then copy only the public site into dist/ (deploy that)
 
 writes:
     js/config.js                 the LX_CONFIG object the site reads at runtime
     index.html, 404.html         page title + description (only those tags)
     CNAME                        when CNAME= is set (github pages), removed otherwise
+    dist/                        with --dist: the files a visitor may see, nothing else
 
 no dependencies, plain python 3. safe to run as a cloudflare pages build command.
 it never touches the evidence or the flags: that is tools/build_evidence.py.
@@ -16,6 +18,7 @@ it never touches the evidence or the flags: that is tools/build_evidence.py.
 import json
 import os
 import re
+import shutil
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -27,6 +30,9 @@ MACHINE_KEYS = ['OS', 'KERNEL', 'HOST', 'DISPLAY', 'CPU', 'GPU', 'MEM', 'SWAP', 
 KNOWN = {'SITE_NAME', 'DOMAINS', 'DESCRIPTION', 'TAGLINE', 'LOCATION', 'OWNER', 'FLAG_PREFIX', 'CNAME', 'EMAIL', 'DISCORD', 'TEAMS', 'ABOUT', 'HYFETCH_PRESET'}
 HOST_RE = re.compile(r'^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$')
 USER_RE = re.compile(r'^[a-z_][a-z0-9_-]{0,23}$')
+# what gets deployed. an allowlist on purpose: tools/ has the flag templates, and with
+# them plus the hashes in js/evidence.gen.js every flag brute-forces in under a second
+PUBLIC = ['index.html', '404.html', 'favicon.svg', '_headers', 'CNAME', 'css', 'js', 'assets', 'evidence']
 
 
 def fail(msg):
@@ -150,6 +156,21 @@ def patch_html(html, cfg, page404=False):
     return html
 
 
+def dist():
+    out = os.path.join(ROOT, 'dist')
+    if os.path.isdir(out):
+        shutil.rmtree(out)
+    os.mkdir(out)
+    for name in PUBLIC:
+        src = os.path.join(ROOT, name)
+        if os.path.isdir(src):
+            shutil.copytree(src, os.path.join(out, name))
+        elif os.path.exists(src):
+            shutil.copy2(src, out)
+    n = sum(len(files) for _, _, files in os.walk(out))
+    print('dist/: %d files from %s' % (n, ', '.join(x for x in PUBLIC if os.path.exists(os.path.join(ROOT, x)))))
+
+
 def main():
     check = '--check' in sys.argv
     try:
@@ -195,6 +216,8 @@ def main():
     print('built from site.env: %s on %s, owner %s, flags %s{...}, hyfetch %s' % (
         cfg['siteName'], ', '.join(cfg['domains']), cfg['owner'], cfg['flagPrefix'], cfg['hyfetchPreset']))
     print('updated: ' + (', '.join(stale) if stale else 'nothing, already up to date'))
+    if '--dist' in sys.argv:
+        dist()
 
 
 if __name__ == '__main__':

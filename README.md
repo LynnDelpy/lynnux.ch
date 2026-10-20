@@ -42,6 +42,11 @@ the plaintext flags only exist in two places:
 the site only ships `sha256(lowercase(flag))` in `js/evidence.gen.js`, and
 `submit` compares hashes locally. reading the js gives you nothing.
 
+**but only if `tools/` stays private.** `build_evidence.py` holds the flag
+templates, and each flag only has 4 random characters on top (38k guesses).
+templates + the hashes = every flag in under a second. so: keep the repo
+private, and deploy `dist/` (see below), never the whole repo.
+
 ## run it locally
 
 ```sh
@@ -128,15 +133,19 @@ that's it, the folder, briefing, downloads and plain view all build themselves.
 
 ## deploying
 
-static files. the generated files are committed, so anything that serves a
-folder works. but only one of the two options can serve **both** domains.
+static files, but **don't deploy the repo root**. `python3 tools/build.py --dist`
+copies only what visitors need into `dist/` (an allowlist: html, css, js,
+fonts, evidence, `_headers`). `tools/`, `site.env`, the README and anything
+you add later stay out unless you add them to `PUBLIC` in `tools/build.py`.
 
 ### cloudflare pages (recommended, and needed for .ch + .li)
 
 1. workers & pages > create > pages > connect the repo
-2. build command: `python3 tools/build.py`, output directory: `/`
+2. production branch: the branch with the site on it.
+   build command: `python3 tools/build.py --dist`, output directory: `dist`
    (the build image has python 3. this way an edit to `site.env` straight on
-   github still deploys correctly, even if nobody ran the build locally)
+   github still deploys correctly, even if nobody ran the build locally.
+   check the build log for `built from site.env` and `dist/: 29 files`)
 3. custom domains > add `lynnux.ch`, `www.lynnux.ch`, `lynnux.li`, `www.lynnux.li`.
    pages wants each hostname added on its own, no wildcards. the domains need
    their DNS on cloudflare for the bare (apex) names to work
@@ -149,13 +158,13 @@ no referrer). works with private repos too.
 `flags.json`, which is private and not in the repo. without it, it would roll
 random flags nobody knows and overwrite the evidence.
 
-### github pages (one domain only)
+### github pages (not recommended)
 
-settings > pages > deploy from branch, folder `/`. github pages allows exactly
-**one** custom domain per site: set `CNAME=lynnux.ch` in `site.env` and run the
-build, it writes the `CNAME` file. the other domain can only redirect there, so
-`.li` visitors end up on `.ch`. `_headers` is ignored, the `<meta>` CSP still
-applies.
+two problems. "deploy from branch" publishes the **whole repo**, `tools/`
+included, so the flags leak (see above). you'd need an actions workflow that
+uploads `dist/` instead. and github pages allows exactly **one** custom domain
+per site (`CNAME=lynnux.ch` in `site.env`, the build writes the `CNAME` file),
+so `.li` could only redirect to `.ch`. `_headers` is ignored there too.
 
 ### ci
 
