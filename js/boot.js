@@ -65,31 +65,49 @@
     await LX.startSession(true);
   }
 
-  // like getty: ask for a name until it is a valid one
+  // the login popup. resolves with a valid name (or 'guest' when skipped)
   function askLogin() {
-    var p = LX.HOST + ' login: ';
-    LX.ui.ps1.textContent = p;
+    var dlg = LX.$('login'), card = LX.$('login-card'), inp = LX.$('login-name'), err = LX.$('login-err'), prev = LX.$('login-preview');
+    LX.$('login-host').textContent = LX.HOST;
+    LX.$('login-sub').textContent = 'Arch Linux ' + LX_CONFIG.machine.kernel + ' (tty1)';
+    inp.value = ''; err.textContent = '';
+    function preview() {
+      var n = inp.value.trim().toLowerCase();
+      prev.innerHTML = n ? span('c-dim', 'you will be  ') + span('u', n) + span('at', '@') + span('h', LX.HOST) + ' ' + span('p', '~') + ' ' + span('c-green', '❯') : '';
+      err.textContent = '';
+    }
+    preview();
+    LX.loginOpen = true;
+    dlg.hidden = false;
+    setTimeout(function () { inp.focus(); }, 30);
     return new Promise(function (resolve) {
-      LX.loginWait = function (v) {
-        var name = v.trim().toLowerCase();
-        LX.term.line(esc(p + v));
-        if (!name) return;
+      function fail(msg) {
+        err.textContent = msg;
+        card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+        inp.focus(); inp.select();
+      }
+      function done(name) {
+        inp.removeEventListener('input', preview);
+        inp.removeEventListener('keydown', onKey);
+        dlg.hidden = true;
+        LX.loginOpen = false;
+        resolve(name);
+      }
+      function attempt() {
+        var name = inp.value.trim().toLowerCase();
+        if (!name) return fail('type a name first (or skip)');
         if (name === 'root') {
           LX.authlog.push(LX.logTime() + ' ' + LX.HOST + ' login[812]: FAILED LOGIN 1 FROM tty1 FOR root, root login refused');
-          LX.term.err('Login incorrect');
-          LX.term.text('(nice try. root logins are disabled, and that attempt is now in /var/log/auth.log)', 'c-dim');
-          return;
+          return fail('Login incorrect. root is disabled, and that attempt is now in /var/log/auth.log ;)');
         }
-        if (!LX.NAME_RE.test(name)) {
-          LX.term.err('Login incorrect');
-          LX.term.text('(pick a name: a-z, 0-9, - and _, starting with a letter, max 24)', 'c-dim');
-          return;
-        }
-        LX.loginWait = null;
-        resolve(name);
-      };
-      LX.running = null;
-      LX.ui.busy(false);
+        if (!LX.NAME_RE.test(name)) return fail('Login incorrect. use a-z, 0-9, - and _, start with a letter');
+        done(name);
+      }
+      function onKey(e) { if (e.key === 'Enter') { e.preventDefault(); attempt(); } }
+      inp.addEventListener('input', preview);
+      inp.addEventListener('keydown', onKey);
+      LX.$('login-go').onclick = attempt;
+      LX.$('login-skip').onclick = function () { done('guest'); };
     });
   }
   function lastLoginStamp(d) {
@@ -103,16 +121,11 @@
     var out = LX.term;
     var name = remembered ? LX.store.get('user', null) : null;
     if (name && !LX.NAME_RE.test(name)) name = null;
-    if (name) out.html(span('c-dim', LX.HOST + ' login: ') + esc(name) + span('c-dim', '  (remembered. `logout` to switch)'));
-    else {
-      out.text('');
-      out.html(span('c-arch', 'Arch Linux') + ' ' + esc(LX_CONFIG.machine.kernel) + ' (tty1)');
-      out.html(span('c-dim', 'pick any name. it only lives in your browser.'));
-      out.text('');
-      name = await askLogin();
-    }
     LX.running = { abort: function () { } };
     LX.ui.busy(true);
+    if (!name) name = await askLogin();
+    out.text('');
+    out.html(span('c-dim', LX.HOST + ' login: ') + esc(name) + (remembered && LX.store.get('user', null) === name ? span('c-dim', '  (remembered. `logout` to switch)') : ''));
     if (name !== LX.USER) { LX.hist.length = 0; LX.histTimes.length = 0; LX.histIdx = 0; }
     LX.USER = name;
     LX.HOME = '/home/' + name;

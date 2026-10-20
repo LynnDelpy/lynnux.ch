@@ -8,8 +8,8 @@ inspired by [lumiingenii.ch](https://lumiingenii.ch), go play their snake.
 
 ## what's in here
 
-- **a login**: visitors pick a name and become `name@lynnux.ch`. the name only
-  lives in their browser (localStorage). `logout` to switch.
+- **a login popup**: visitors pick a name (or skip as guest) and become
+  `name@lynnux.ch`. the name only lives in their browser. `logout` to switch.
 - **a terminal** (zsh flavoured: syntax highlighting, autosuggestions) with pipes, `;` `&&` `||`, `>` `>>` (binary safe), globs, `$VARS`,
   tab completion and history. click anything underlined.
 - **in-browser forensics tools** that work on the actual bytes:

@@ -48,6 +48,23 @@
 </div>
 <div id="toast" role="status"></div>
 
+<div id="login" class="login" hidden role="dialog" aria-modal="true" aria-labelledby="login-title">
+  <div class="login-card" id="login-card">
+    <div class="login-tape" aria-hidden="true"></div>
+    <h1 id="login-title"><span class="c-amber" id="login-host">lynnux.ch</span> login</h1>
+    <p class="login-sub" id="login-sub"></p>
+    <label for="login-name">username</label>
+    <input id="login-name" type="text" maxlength="24" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+    <div class="login-preview" id="login-preview" aria-live="polite"></div>
+    <div class="login-err" id="login-err" role="alert"></div>
+    <div class="login-btns">
+      <button type="button" id="login-go">log in</button>
+      <button type="button" id="login-skip">skip, be guest</button>
+    </div>
+    <p class="login-note">any name works. it only lives in your browser.</p>
+  </div>
+</div>
+
 <script src="js/config.js"></script>
 <script src="js/evidence.gen.js"></script>
 <script src="js/core.js"></script>

@@ -396,7 +396,7 @@ LX.running = null;
 
 LX.run = async function (line, opts) {
   opts = opts || {};
-  if (LX.loginWait) return; // nobody is logged in yet
+  if (LX.loginOpen) return; // nobody is logged in yet
   line = line.replace(/\s+$/, '');
   if (!opts.silent) LX.term.echo(line);
   if (!line.trim()) return;
@@ -504,13 +504,12 @@ LX.ui = {
   // repaint the highlighted mirror behind the input, plus the grey autosuggestion
   renderInput: function () {
     var ui = LX.ui, v = ui.input.value;
-    if (LX.loginWait) { ui.suggestion = ''; ui.hl.textContent = v; return; } // a name, not a command
     ui.suggestion = v && ui.input.selectionStart === v.length ? LX.suggest(v) : '';
     ui.hl.innerHTML = LX.highlight(v) + (ui.suggestion ? LX.span('c-dim', ui.suggestion.slice(v.length)) : '');
     ui.hl.scrollLeft = ui.input.scrollLeft;
   },
   updatePrompt: function () {
-    if (!LX.loginWait) this.ps1.innerHTML = this.promptHTML();
+    this.ps1.innerHTML = this.promptHTML();
     LX.$('st-cwd').textContent = LX.fs.display(LX.fs.cwd);
     if (LX.cases) LX.$('st-ev').textContent = 'evidence ' + LX.cases.solvedCount() + '/' + LX.cases.total();
   },
@@ -521,7 +520,7 @@ LX.ui = {
     if (!on) { this.input.value = ''; this.renderInput(); this.focus(); this.scroll(); }
   },
   focus: function () {
-    if (LX.keys.length || !LX.$('overlay').hidden) return;
+    if (LX.keys.length || !LX.$('overlay').hidden || LX.loginOpen) return;
     var sel = window.getSelection && window.getSelection().toString();
     if (sel) return; // let people copy text
     var a = document.activeElement;
@@ -572,13 +571,6 @@ LX.histIdx = 0;
 LX.ui.input.addEventListener('keydown', function (e) {
   if (LX.keys.length || LX.running) return;
   var inp = LX.ui.input;
-  if (LX.loginWait) {
-    if (e.key === 'Enter') { e.preventDefault(); var name = inp.value; inp.value = ''; LX.ui.renderInput(); LX.loginWait(name); }
-    else if (e.key === 'Tab' || e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault();
-    else if (e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'u' || e.key === 'U')) { e.preventDefault(); inp.value = ''; }
-    requestAnimationFrame(LX.ui.renderInput);
-    return;
-  }
   var atEnd = inp.selectionStart === inp.value.length && inp.selectionEnd === inp.value.length;
   if (e.key === 'Enter') { e.preventDefault(); var v = inp.value; inp.value = ''; LX.ui.renderInput(); LX.run(v); return; }
   else if ((e.key === 'ArrowRight' || e.key === 'End') && atEnd && LX.ui.suggestion) { e.preventDefault(); inp.value = LX.ui.suggestion; }
@@ -608,7 +600,7 @@ document.addEventListener('keydown', function (e) {
     return;
   }
   if (LX.running && e.ctrlKey && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); LX.running.abort(); return; }
-  if (LX.running) return;
+  if (LX.running || LX.loginOpen) return;
   // typing anywhere goes to the prompt
   var a = document.activeElement;
   if (a !== LX.ui.input && !(a && a.closest && a.closest('#gui')) && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) LX.ui.focus();
@@ -625,7 +617,7 @@ LX.ui.out.addEventListener('keydown', function (e) {
   if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); if (!LX.running) LX.run(t.getAttribute('data-cmd')); }
 });
 document.addEventListener('click', function (e) {
-  if (e.target.closest('a,button,input,#gui,[data-cmd],audio,canvas,#overlay')) return;
+  if (e.target.closest('a,button,input,#gui,[data-cmd],audio,canvas,#overlay,#login')) return;
   LX.ui.focus();
 });
 
