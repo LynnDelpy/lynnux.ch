@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>lynnux</title>
+<meta name="description" content="a forensic workstation in your browser. portfolio, links, and real forensics challenges you can solve right here.">
+<meta name="theme-color" content="#0b0c0e">
+<meta property="og:title" content="lynnux">
+<meta property="og:description" content="a forensic workstation in your browser. portfolio, links, and real forensics challenges you can solve right here.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/JetBrainsMono-Regular.subset.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="tape" aria-hidden="true"><div class="tape-track" id="tape-track"></div></div>
+<div id="hexbg" aria-hidden="true"></div>
+
+<main id="term">
+  <div id="out" role="log" aria-live="polite" aria-label="terminal output"></div>
+  <div class="prompt-line" id="pl">
+    <label for="in" id="ps1"></label>
+    <div class="in-wrap">
+      <div id="in-hl" aria-hidden="true"></div>
+      <input type="text" id="in" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="terminal input" enterkeyhint="send">
+    </div>
+  </div>
+</main>
+
+<footer id="status" aria-hidden="true">
+  <span class="st-badge">lynnux.ch</span>
+  <span class="st-win">0:sh*</span>
+  <span class="st-cwd" id="st-cwd">~</span>
+  <span class="st-fill"></span>
+  <span class="st-wb" title="write-blocker">wb:RO</span>
+  <span class="st-ev" id="st-ev">evidence 0/0</span>
+  <span class="st-clock" id="st-clock">--:--</span>
+</footer>
+
+<button id="gui-toggle" type="button" aria-controls="gui" aria-expanded="false">not a terminal person?</button>
+<aside id="gui" hidden aria-label="plain view"></aside>
+
+<div id="overlay" hidden role="dialog" aria-modal="true">
+  <div class="ov-head"><span id="ov-title"></span><span id="ov-help"></span><button type="button" id="ov-close">esc</button></div>
+  <div id="ov-body"></div>
+</div>
+<div id="toast" role="status"></div>
+
+<div id="login" class="login" hidden role="dialog" aria-modal="true" aria-labelledby="login-title">
+  <div class="login-card" id="login-card">
+    <div class="login-tape" aria-hidden="true"></div>
+    <h1 id="login-title"><span class="c-amber" id="login-host">lynnux.ch</span> login</h1>
+    <p class="login-sub" id="login-sub"></p>
+    <label for="login-name">username</label>
+    <input id="login-name" type="text" maxlength="24" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+    <div class="login-preview" id="login-preview" aria-live="polite"></div>
+    <div class="login-err" id="login-err" role="alert"></div>
+    <div class="login-btns">
+      <button type="button" id="login-go">log in</button>
+      <button type="button" id="login-skip">skip, be guest</button>
+    </div>
+    <p class="login-note">any name works. it only lives in your browser.</p>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/domain.js"></script>
+<script src="js/evidence.gen.js"></script>
+<script src="js/core.js"></script>
+<script src="js/fsdata.js"></script>
+<script src="js/commands.js"></script>
+<script src="js/forensics.js"></script>
+<script src="js/viewers.js"></script>
+<script src="js/netdisk.js"></script>
+<script src="js/cases.js"></script>
+<script src="js/fun.js"></script>
+<script src="js/extra.js"></script>
+<script src="js/man.js"></script>
+<script src="js/gui.js"></script>
+<script src="js/boot.js"></script>
+</body>
+</html>
