@@ -190,7 +190,7 @@
     // ---- cases
     cases: { d: 'the evidence locker: every case and your progress', syn: 'cases', desc: 'lists the cases. click one to open its briefing. progress is stored in your browser.', see: ['hint', 'submit', 'intro'] },
     hint: { d: 'a nudge for a case', syn: 'hint [case] [1|2]', desc: 'each case has two hints, from gentle to blunt. run it twice for the second. inside a case folder the case number is optional.', see: ['cases'] },
-    submit: { d: 'submit a flag', syn: 'submit ' + LX_CONFIG.flagPrefix + '{...}', desc: 'flags are checked by comparing sha256 hashes, locally. your guess never leaves the browser and the real flags are not in the source.', see: ['cases'] },
+    submit: { d: 'submit a flag', syn: 'submit ' + LX_CONFIG.flagPrefix + '{...}', desc: 'flags are checked locally: your guess goes through PBKDF2 (' + LX_EVIDENCE.kdf.iterations.toLocaleString('en') + ' rounds of SHA-256) and the result is compared to the hashes in the source. your guess never leaves the browser. the source is public, so every flag carries 10 random characters, which makes guessing them a matter of months per flag on a big GPU. solving the case is faster.', see: ['cases'] },
 
     // ---- system
     history: { d: 'your shell history', syn: 'history [-i] [-c]', opts: [['-i', 'with timestamps'], ['-c', 'clear the session history']], notes: 'shell history is evidence. it is also in ~/.zsh_history, with unix timestamps.', see: ['zsh', 'last'] },

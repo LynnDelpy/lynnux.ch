@@ -4,6 +4,8 @@ SOLUTIONS.md
 
 # build output (python3 tools/build.py --dist)
 dist/
+dist.new/
+dist.old/
 
 __pycache__/
 .DS_Store

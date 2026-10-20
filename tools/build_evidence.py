@@ -6,12 +6,14 @@ build_evidence.py - generates every challenge artifact (flag prefix from site.en
     python3 tools/build_evidence.py --new      # roll fresh flags (new random suffixes)
 
 Plaintext flags live ONLY in flags.json (gitignored) and inside the evidence
-files themselves. The website gets nothing but sha256 hashes via
-js/evidence.gen.js, so reading the JS does not leak a single flag.
+files themselves. The website gets nothing but slow PBKDF2 hashes via
+js/evidence.gen.js. This file is public, so the flag templates below are no
+secret: what protects a flag is its 10 random characters times the cost of
+the hash (see README, "how flags stay secret").
 
 needs: python3, pillow, numpy
 """
-import hashlib, io, json, math, os, random, secrets, struct, sys, zipfile, zlib
+import hashlib, io, json, math, os, random, re, secrets, struct, sys, zipfile, zlib
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -40,6 +42,16 @@ FLAG_BODIES = {
     '007': 'z3r0_w1dth_but_n0t_z3r0_1nf0_%s',
 }
 HEX_SAFE = '23456789abcdef'  # no 0/1, so visual flags stay readable
+# assume the attacker has this file and js/evidence.gen.js (the repo is public).
+# 14^10 suffixes (~2^38) per flag, and every guess costs a full PBKDF2 run
+SUFFIX_LEN = 10
+KDF_ITER = 600000  # PBKDF2-HMAC-SHA256, owasp's number. a submit costs one run in the browser
+
+
+def strong(k, flag):
+    """made with the current prefix, template and suffix length? old 4 char flags are not"""
+    rx = re.escape(FLAG_PREFIX + '{') + re.escape(FLAG_BODIES[k]).replace('%s', '[%s]{%d}' % (HEX_SAFE, SUFFIX_LEN)) + re.escape('}')
+    return re.fullmatch(rx, flag) is not None
 
 
 def load_flags(new=False):
@@ -49,17 +61,27 @@ def load_flags(new=False):
             flags = json.load(f)
     changed = False
     for k, body in FLAG_BODIES.items():
-        # missing, or made with another FLAG_PREFIX: roll a fresh one
-        if k not in flags or not flags[k].startswith(FLAG_PREFIX + '{'):
+        # missing, another FLAG_PREFIX, or an old short suffix: roll a fresh one
+        if k not in flags or not strong(k, flags[k]):
             if k in flags:
-                print('[*] flag %s used another prefix, rolling a new %s{...} one' % (k, FLAG_PREFIX))
-            flags[k] = FLAG_PREFIX + '{' + body % ''.join(secrets.choice(HEX_SAFE) for _ in range(4)) + '}'
+                print('[*] flag %s is from an older or different setup, rolling a new one' % k)
+            flags[k] = FLAG_PREFIX + '{' + body % ''.join(secrets.choice(HEX_SAFE) for _ in range(SUFFIX_LEN)) + '}'
             changed = True
     if changed:
         with open(FLAGS_PATH, 'w') as f:
             json.dump(flags, f, indent=2)
         print('[*] wrote', FLAGS_PATH, '(keep it safe, never commit it)')
-    return flags
+    return flags, changed
+
+
+def kdf_salt(fresh):
+    """the salt is public (it ships in evidence.gen.js). reuse it until the flags change,
+    so a rebuild with the same flags gives the same file"""
+    if not fresh and os.path.exists(GEN_JS):
+        m = re.search(r'"salt":\s*"([0-9a-f]{32})"', open(GEN_JS, encoding='utf-8').read())
+        if m:
+            return m.group(1)
+    return secrets.token_hex(16)
 
 
 def font(size, bold=True):
@@ -259,9 +281,11 @@ def case_003(flag):
     bio = io.BytesIO()
     Image.fromarray(arr).save(bio, 'JPEG', quality=84)
     jpg = bio.getvalue()
+    # the zip is built on its own and glued on, like `cat photo.jpg loot.zip > lake.jpg`.
+    # its offsets count from the zip's own start, so a carved copy (binwalk -e, dd) is a
+    # valid zip, and unzip on the whole jpeg still works (it skips the leading bytes)
     zbio = io.BytesIO()
-    zbio.write(jpg)
-    with zipfile.ZipFile(zbio, 'a', zipfile.ZIP_DEFLATED) as z:
+    with zipfile.ZipFile(zbio, 'w', zipfile.ZIP_DEFLATED) as z:
         info = lambda n: zipfile.ZipInfo(n, date_time=(2025, 7, 30, 23, 12, 4))
         z.writestr(info('itinerary.txt'),
                    'day 1  zurich hb, 07:32 to bern\n'
@@ -274,7 +298,7 @@ def case_003(flag):
                    '    ' + flag + '\n\n'
                    'tip: real photos end at FF D9. anything after that is a story.\n',
                    zipfile.ZIP_DEFLATED)
-    data = zbio.getvalue()
+    data = jpg + zbio.getvalue()
     assert flag.encode() not in data, 'flag leaked in plaintext, deflate did not kick in?'
     write(os.path.join(EVID, 'case-003', 'lake.jpg'), data)
 
@@ -560,7 +584,8 @@ def zero_width(flag):
 
 # ---------------------------------------------------------------- manifest
 def main():
-    flags = load_flags(new='--new' in sys.argv)
+    flags, changed = load_flags(new='--new' in sys.argv)
+    salt = kdf_salt(changed)
     case_001(flags['001'])
     case_002(flags['002'])
     case_003(flags['003'])
@@ -576,14 +601,16 @@ def main():
                 'name': fn, 'path': 'evidence/%s/%s' % (case, fn), 'size': len(data),
                 'md5': hashlib.md5(data).hexdigest(), 'sha256': hashlib.sha256(data).hexdigest()})
     manifest = {
-        'hashes': {k: hashlib.sha256(v.strip().lower().encode()).hexdigest() for k, v in sorted(flags.items())},
+        'kdf': {'name': 'PBKDF2', 'hash': 'SHA-256', 'iterations': KDF_ITER, 'salt': salt},
+        'hashes': {k: hashlib.pbkdf2_hmac('sha256', v.strip().lower().encode(), bytes.fromhex(salt), KDF_ITER).hex()
+                   for k, v in sorted(flags.items())},
         'files': files,
         'zw': zero_width(flags['007']),
     }
     os.makedirs(os.path.dirname(GEN_JS), exist_ok=True)
     with open(GEN_JS, 'w', encoding='utf-8') as f:
         f.write('// generated by tools/build_evidence.py, do not edit by hand.\n'
-                '// flag hashes only: sha256(lowercase(flag)). the flags live inside the evidence.\n')
+                '// flag hashes only: pbkdf2-sha256(lowercase(flag), salt, iterations). the flags live inside the evidence.\n')
         f.write('var LX_EVIDENCE=' + json.dumps(manifest, indent=1, ensure_ascii=True) + ';\n')
     print('[+] js/evidence.gen.js')
 

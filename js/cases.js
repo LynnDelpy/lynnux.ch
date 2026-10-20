@@ -1,5 +1,6 @@
 // cases.js :: the evidence locker. briefings, hints, flag submission, progress.
-// flags are never in this file. submissions are sha256'd and compared to LX_EVIDENCE.hashes.
+// flags are never in this file. a submission goes through the same slow PBKDF2 as the
+// build (salt + rounds in LX_EVIDENCE.kdf) and gets compared to LX_EVIDENCE.hashes.
 'use strict';
 
 var LX_CASES = [
@@ -127,7 +128,12 @@ var LX_CASES = [
     },
     // returns the case id for a correct flag, or null
     check: async function (flag) {
-      var h = await LX.sha('SHA-256', new TextEncoder().encode(String(flag).trim().toLowerCase()));
+      if (!window.crypto || !crypto.subtle) throw new Error('webcrypto needs https (or localhost)');
+      var k = LX_EVIDENCE.kdf;
+      var key = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(flag).trim().toLowerCase()), 'PBKDF2', false, ['deriveBits']);
+      var salt = new Uint8Array(k.salt.match(/../g).map(function (x) { return parseInt(x, 16); }));
+      var bits = await crypto.subtle.deriveBits({ name: k.name, hash: k.hash, salt: salt, iterations: k.iterations }, key, 256);
+      var h = Array.from(new Uint8Array(bits), function (x) { return LX.hex(x); }).join('');
       var ids = Object.keys(LX_EVIDENCE.hashes);
       for (var i = 0; i < ids.length; i++) if (LX_EVIDENCE.hashes[ids[i]] === h) return ids[i];
       return null;
@@ -188,7 +194,7 @@ var LX_CASES = [
     }
     var id = await LX.cases.check(flag);
     if (!id) {
-      ctx.out.html(span('c-red', 'no match in the evidence database.') + span('c-dim', ' (only a sha256 of your guess is compared, it never leaves the browser)'));
+      ctx.out.html(span('c-red', 'no match in the evidence database.') + span('c-dim', ' (only a slow hash of your guess is compared, it never leaves the browser)'));
       return 1;
     }
     var c = byId(id), fresh = LX.cases.markSolved(id);

@@ -39,13 +39,23 @@ the plaintext flags only exist in two places:
 1. inside the evidence files (that's the point)
 2. `flags.json`, which is **gitignored**. back it up somewhere safe.
 
-the site only ships `sha256(lowercase(flag))` in `js/evidence.gen.js`, and
-`submit` compares hashes locally. reading the js gives you nothing.
+the site only ships a hash of each flag in `js/evidence.gen.js`, and
+`submit` compares hashes locally. your guess never leaves the browser.
 
-**but only if `tools/` stays private.** `build_evidence.py` holds the flag
-templates, and each flag only has 4 random characters on top (38k guesses).
-templates + the hashes = every flag in under a second. so: keep the repo
-private, and deploy `dist/` (see below), never the whole repo.
+the threat model assumes **everything in this repo is public**, including
+`tools/build_evidence.py` with the flag templates (`bit_planes_tell_tales_...`).
+so the templates are no secret. two things are:
+
+- **10 random characters** per flag (from 14 symbols, no 0/1 so image flags
+  stay readable): about 2.9 * 10^11 possibilities each
+- a **slow hash**: PBKDF2-HMAC-SHA256, 600,000 rounds, random salt. one submit
+  costs about 0.3 s in a browser, which is nothing for a player and a lot for
+  a brute forcer
+
+together that is roughly 4 months per flag on one high-end GPU, versus solving
+the case in 20 minutes. (the first version had 4 random characters and plain
+sha256: all 7 flags fell in 0.17 s from the public files. those flags are
+retired, and the generator replaces flags that weak by itself.)
 
 ## run it locally
 
@@ -66,7 +76,7 @@ the file itself, and an empty value hides that thing on the site.
 
 ```sh
 $EDITOR site.env
-python3 tools/build.py            # site.env -> js/config.js, page titles, meta tags, CNAME
+python3 tools/build.py            # site.env -> js/config.js, page titles, meta tags, CNAME, deploy/
 python3 tools/build.py --check    # only check that everything is in sync (exit 1 if not)
 ```
 
@@ -119,7 +129,9 @@ python3 tools/build_evidence.py --new    # roll new random flags
 ```
 
 this regenerates `evidence/*` and `js/evidence.gen.js`. if `flags.json` doesn't
-exist it creates one.
+exist it creates one, and any flag in it that is weaker than the current rules
+(old short suffix, other `FLAG_PREFIX`) gets replaced. same flags in, same bytes
+out, so a rebuild only shows up in git when something really changed.
 
 ## adding a case
 
@@ -133,44 +145,68 @@ that's it, the folder, briefing, downloads and plain view all build themselves.
 
 ## deploying
 
-static files, but **don't deploy the repo root**. `python3 tools/build.py --dist`
-copies only what visitors need into `dist/` (an allowlist: html, css, js,
-fonts, evidence, `_headers`). `tools/`, `site.env`, the README and anything
-you add later stay out unless you add them to `PUBLIC` in `tools/build.py`.
+**serve `dist/`, not the repo root.** `python3 tools/build.py --dist` copies only
+what visitors need into `dist/` (an allowlist: html, css, js, fonts, evidence).
+nothing in the repo is secret, but there is no reason to serve build tools, and
+anything you add later stays out unless you add it to `PUBLIC` in
+`tools/build.py`. a smaller surface is a smaller surface.
 
-### cloudflare pages (recommended, and needed for .ch + .li)
+### your own server (caddy or nginx)
 
-1. workers & pages > create > pages > connect the repo
-2. production branch: the branch with the site on it.
-   build command: `python3 tools/build.py --dist`, output directory: `dist`
-   (the build image has python 3. this way an edit to `site.env` straight on
-   github still deploys correctly, even if nobody ran the build locally.
-   check the build log for `built from site.env` and `dist/: 29 files`)
-3. custom domains > add `lynnux.ch`, `www.lynnux.ch`, `lynnux.li`, `www.lynnux.li`.
-   pages wants each hostname added on its own, no wildcards. the domains need
-   their DNS on cloudflare for the bare (apex) names to work
-4. optional: a redirect rule `www.*` -> bare domain (see the storage note above)
+the build also writes ready configs into `deploy/`, made from `DOMAINS` and
+`WEBROOT` in `site.env` and the security headers in `_headers`:
 
-it reads `_headers`, so you get the full security headers (CSP, no framing,
-no referrer). works with private repos too.
+- `deploy/Caddyfile` **(recommended)**. caddy gets and renews the https
+  certificates for every domain by itself, redirects http to https, and
+  redirects `www.` to the bare domain.
+- `deploy/nginx.conf` if nginx already runs on the box. https comes from
+  `certbot --nginx` (the exact command is in the file).
 
-**never** put `tools/build_evidence.py` in the build command. it needs
-`flags.json`, which is private and not in the repo. without it, it would roll
-random flags nobody knows and overwrite the evidence.
+both send the full security headers (CSP, HSTS, no framing, no referrer),
+serve the 404 page with a real 404 status, and were tested end to end.
+
+setup, once (the paths assume the default `WEBROOT=/srv/lynnux/dist`):
+
+1. DNS: an `A` record (and `AAAA` if the server has working IPv6) for
+   `lynnux.ch`, `www.lynnux.ch`, `lynnux.li` and `www.lynnux.li`, pointing at
+   the server. no wildcard needed. ports 80 and 443 open
+2. the repo is private, so give the server a **read-only deploy key** for this
+   one repo (github: repo settings > deploy keys, leave "allow write" off)
+3. `git clone git@github.com:LynnDelpy/lynnux.ch.git /srv/lynnux`
+4. `cd /srv/lynnux && python3 tools/build.py --dist`
+5. caddy: add `import /srv/lynnux/deploy/Caddyfile` to `/etc/caddy/Caddyfile`,
+   then `systemctl reload caddy`. nginx: follow the comment at the top of
+   `deploy/nginx.conf`
+
+updating, every time:
+
+```sh
+cd /srv/lynnux && git pull --ff-only && python3 tools/build.py --dist
+```
+
+`--dist` builds next to the live folder and swaps it in, so visitors never see
+a half copied site. reload caddy/nginx only when `DOMAINS`, `WEBROOT` or
+`_headers` changed.
+
+**never** run `tools/build_evidence.py` on the server or put `flags.json`
+there. the server doesn't need either.
+
+### static hosts (cloudflare pages, netlify)
+
+build command `python3 tools/build.py --dist`, output directory `dist`, then
+add every domain as a custom domain. they read `_headers` directly.
 
 ### github pages (not recommended)
 
-two problems. "deploy from branch" publishes the **whole repo**, `tools/`
-included, so the flags leak (see above). you'd need an actions workflow that
-uploads `dist/` instead. and github pages allows exactly **one** custom domain
-per site (`CNAME=lynnux.ch` in `site.env`, the build writes the `CNAME` file),
-so `.li` could only redirect to `.ch`. `_headers` is ignored there too.
+it allows only **one** custom domain (`CNAME=` in `site.env`), so `.li` could
+only redirect to `.ch`. "deploy from branch" also serves the whole repo instead
+of `dist/`, and `_headers` is ignored.
 
 ### ci
 
 `.github/workflows/check.yml` runs `python3 tools/build.py --check` on every
 push and pull request. if someone edits `site.env` and forgets the build, it
-goes red instead of silently deploying old values (on github pages).
+goes red instead of silently deploying old values.
 
 ## layout
 
@@ -180,6 +216,7 @@ index.html            the page
 404.html              the not-found page
 css/style.css         all styling
 js/config.js          generated from site.env, don't edit
+deploy/               generated caddy + nginx configs for your own server
 js/domain.js          picks the domain the visitor is on, fills {domain}
 js/core.js            shell engine: fs, tokenizer, pipes, redirects
 js/fsdata.js          what's on the virtual disk
@@ -195,7 +232,7 @@ js/gui.js             the plain view panel
 js/boot.js            boot sequence
 js/evidence.gen.js    generated: flag hashes + evidence file hashes
 evidence/             generated challenge files
-tools/build.py        site.env -> config.js + html
+tools/build.py        site.env -> config.js, html, deploy/, and dist/ with --dist
 tools/siteenv.py      the site.env parser (shared by both builders)
 tools/build_evidence.py
 ```
