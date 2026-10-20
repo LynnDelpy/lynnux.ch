@@ -101,6 +101,13 @@ LX.buildFS = function () {
       'hyfetch',
       ''
     ].join('\n')),
+    '.local': D({ share: D({ Trash: D({
+      files: D({ 'note_to_self.txt': F('if you are reading this, you went through the trash.\n' +
+        "that is exactly what a forensic investigator does. you'd be good at this.\n\n" +
+        'tip: on a real linux desktop, ~/.local/share/Trash/info/*.trashinfo\n' +
+        'tells you where a file came from and when it was deleted.\n') }),
+      info: D({ 'note_to_self.txt.trashinfo': F('[Trash Info]\nPath=' + LX.HOME + '/note_to_self.txt\nDeletionDate=2025-08-01T23:59:12\n') })
+    }) }) }),
     '.config': D({
       'hyfetch.json': F(JSON.stringify({
         preset: 'lesbian', mode: 'rgb', light_dark: 'dark', lightness: 0.65,
@@ -112,9 +119,24 @@ LX.buildFS = function () {
   });
 
   var cpu = C.machine.cpu || 'unknown';
+  // /usr/bin: one tiny fake ELF per command. `strings /usr/bin/grep` shows its usage
+  function usrBin() {
+    var d = {}, hdr = [0x7f, 0x45, 0x4c, 0x46, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0x3e, 0, 1, 0, 0, 0];
+    Object.keys(LX.cmds).sort().forEach(function (k) {
+      var c = LX.cmds[k];
+      if (c.hidden) return;
+      var txt = new TextEncoder().encode('\0lynnux ' + k + '\0usage: ' + c.usage + '\0' + c.help + '\0GCC: (GNU) 15.2.1\0');
+      var b = new Uint8Array(hdr.length + 40 + txt.length);
+      b.set(hdr); b.set(txt, hdr.length + 40);
+      d[k] = { t: 'b', data: b, ro: true };
+    });
+    return D(d);
+  }
   LX.fs.root = D({
     home: D((function () { var h = {}; h[LX.USER] = home; return h; })()),
     tmp: D({}),
+    'lost+found': D({ '#1337': F('fsck found this:\n\nyour motivation. it was in /lost+found the whole time.\n\n(go solve a case: `cases`)\n') }),
+    usr: D({ bin: usrBin(), share: D({ man: D({ README: F('the manual pages live in js/man.js on the real web server. use `man <command>`.\n') }) }) }),
     dev: D({
       'null': F('', { devnull: true }),
       zero: { t: 'b', data: new Uint8Array(4096) },

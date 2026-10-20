@@ -13,8 +13,16 @@ inspired by [lumiingenii.ch](https://lumiingenii.ch), go play their snake.
 - **a terminal** (zsh flavoured: syntax highlighting, autosuggestions) with pipes, `;` `&&` `||`, `>` `>>` (binary safe), globs, `$VARS`,
   tab completion and history. click anything underlined.
 - **in-browser forensics tools** that work on the actual bytes:
-  `file` `strings` `xxd` `hexdump` `exiftool` `binwalk -e` `dd` `unzip`
-  `md5sum` `sha256sum` `stegsolve` `spectrogram` `tcpdump` `fsstat` `fls` `icat`
+  `file` `strings` `xxd` `hexdump` `exiftool` `binwalk -e` `foremost` `dd` `unzip`
+  `stat` `entropy` `xor` `pngcheck` `cmp` `md5sum` `sha256sum` `stegsolve`
+  `spectrogram` `tcpdump` `fsstat` `fls` `icat`
+- **130+ commands** in total: text tools (`sed`, `awk`, `jq`, `diff`, `calc`, ...),
+  system tools that back up the absurd specs (`htop`, `nvidia-smi`, `lscpu`, `free`,
+  `last`, `dmesg`, ...), and every network tool tells you the box is air-gapped.
+- **man pages for everything**: a real pager (`man grep`, `q` quits), apropos /
+  whatis / tldr, concept pages (`man 7 forensics`, `man hier`, `man lynnux`) and
+  FORENSICS NOTES on the forensics tools. pages live in `js/man.js`.
+- **easter eggs.** not telling. `man hier` is a decent place to start digging.
 - **7 cases**: metadata, bit-plane stego, file carving, dns exfil, deleted file
   recovery on FAT12, audio spectrogram, plus one that isn't on the list.
 - **a write-blocker**: `~/cases` is read-only. tools that produce files drop them
@@ -99,6 +107,8 @@ js/viewers.js         view, stegsolve, spectrogram, play
 js/netdisk.js         tcpdump, fsstat, fls, icat
 js/cases.js           case briefings, hints, submit
 js/fun.js             fastfetch, hyfetch, fortune, magic, enhance
+js/extra.js           text/forensics/system extras, easter eggs
+js/man.js             pager, man, apropos, whatis, tldr + all manual pages
 js/gui.js             the plain view panel
 js/boot.js            boot sequence
 js/evidence.gen.js    generated: flag hashes + evidence file hashes

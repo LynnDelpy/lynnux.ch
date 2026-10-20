@@ -191,6 +191,7 @@
     }
     fetch(ctx, { colors: cols, key: cols[1], title: cols[0] });
   });
+  LX.PRIDE = PRIDE; LX.liftColor = lift;
   def('neofetch', { cat: 'fun', hidden: true }, function (ctx) {
     ctx.out.html(span('c-dim', 'neofetch: upstream archived it in 2024. here it is hyfetch, with fastfetch underneath.'));
     return LX.cmds.hyfetch.fn(ctx);

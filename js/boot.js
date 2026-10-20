@@ -132,6 +132,11 @@
     var last = LX.store.get('lastLogin', null), now = new Date();
     LX.store.set('user', name);
     LX.store.set('lastLogin', lastLoginStamp(now));
+    // wtmp for `last`: close a session that never logged out, then open ours
+    var wt = LX.store.get('wtmp', []);
+    if (wt.length && !wt[wt.length - 1].end) wt[wt.length - 1].gone = true;
+    wt.push({ u: name, t: now.getTime() });
+    LX.store.set('wtmp', wt.slice(-20));
     LX.authlog.push(LX.logTime(now) + ' ' + LX.HOST + ' login[812]: pam_unix(login:session): session opened for user ' + name + '(uid=1001) by LOGIN(uid=0)');
     out.text(last ? 'Last login: ' + last + ' on tty1' : 'first login. welcome.', 'c-dim');
     LX.status = 0;

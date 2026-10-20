@@ -27,7 +27,6 @@
     ['media', 'stego + media'], ['netdisk', 'network + disk'], ['cases', 'cases'], ['system', 'system'], ['fun', 'fun']
   ];
   def('help', { cat: 'start', help: 'this list. `help <cmd>` for details', usage: 'help [command]' }, function (ctx) {
-    if (ctx.args[0]) return LX.cmds.man.fn(ctx);
     ctx.out.html(span('c-amber b', LX.HOST) + span('c-dim', ' :: forensic workstation, guest shell'));
     CAT_ORDER.forEach(function (c) {
       var names = Object.keys(LX.cmds).filter(function (k) { return LX.cmds[k].cat === c[0] && !LX.cmds[k].hidden; }).sort();
@@ -42,16 +41,8 @@
     });
     ctx.out.text('');
     ctx.out.html(span('c-dim', 'pipes, ; && ||, > >>, globs and tab completion all work. try: ') + LX.cmdLink('fortune | rev', 'fortune | rev'));
-    ctx.out.html(span('c-dim', 'click anything that is underlined on hover. ctrl+c cancels, ctrl+l clears.'));
-  });
-  def('man', { cat: 'start', help: 'manual for a command', usage: 'man <command>' }, function (ctx) {
-    var n = ctx.args[0];
-    if (!n) { ctx.out.err('what manual page do you want?'); return; }
-    var c = LX.cmds[n] || (LX.aliases[n] && { usage: n, help: 'alias for `' + LX.aliases[n] + '`' });
-    if (!c) { ctx.out.err('No manual entry for ' + n); return; }
-    ctx.out.html(span('c-amber b', n) + span('c-dim', '  ' + (c.cat ? c.cat : 'alias')));
-    ctx.out.html('  ' + span('c-dim', 'usage: ') + esc(c.usage));
-    ctx.out.html('  ' + esc(c.help));
+    ctx.out.html(span('c-dim', 'every command has a manual: ') + LX.cmdLink('man grep', 'man grep', 'c-cyan') + span('c-dim', '. examples only: ') + LX.cmdLink('tldr binwalk', 'tldr binwalk', 'c-cyan') + span('c-dim', '. search: ') + LX.cmdLink('apropos carve', 'apropos carve', 'c-cyan'));
+    ctx.out.html(span('c-dim', 'click anything that is underlined on hover. ctrl+c cancels, ctrl+l clears. there are a few hidden ones, too.'));
   });
 
   // ------------------------------------------------------------ navigate
@@ -223,6 +214,8 @@
               span('c-dim', ', ') + LX.cmdLink('xxd ' + LX.quote(srcs[i]) + ' | head', 'xxd') + span('c-dim', ' or ') + LX.cmdLink('strings ' + LX.quote(srcs[i]), 'strings'));
             continue;
           }
+          // binary into a pipe or file: pass the bytes through untouched
+          if (!isText && !(o.f.A || o.f.v || o.f.E || o.f.T || o.f.n)) { ctx.out.bytes(b); continue; }
           s = isText ? LX.bytesToText(b) : Array.from(b.subarray(0, 200000), function (c) { return String.fromCharCode(c); }).join('');
         } else s = await LX.fs.text(f.node);
       }
@@ -245,7 +238,7 @@
       if (ctx.args[ai] === '-e' && ai + 1 < ctx.args.length) pats.push(ctx.args[++ai]);
       else args.push(ctx.args[ai]);
     }
-    var o = LX.opts(args, { flags: 'ivnocaFrEhH', vals: 'm' });
+    var o = LX.opts(args, { flags: 'ivnocaFrEhH', vals: 'mABC' });
     if (!pats.length) pats = o.rest.splice(0, 1);
     if (!pats.length) return ctx.out.err('usage: grep [-ivnocaFr] [-e pattern]... pattern [file...]');
     var files = o.rest, re;
@@ -267,11 +260,20 @@
     var multi = (targets.length > 1 || o.f.r) && !o.f.h || o.f.H;
     async function scan(label, text, isBin) {
       var lines = text.replace(/\n$/, '').split('\n'), count = 0;
+      // -A/-B/-C context: lastOut is the last line printed, after counts trailing context
+      var A = LX.num(o.v.C || o.v.A, 0), Bc = LX.num(o.v.C || o.v.B, 0), lastOut = -1, after = 0;
+      var ctxLine = function (k) { ctx.out.text((multi ? label + '-' : '') + (o.f.n ? (k + 1) + '-' : '') + lines[k], ctx.piped ? '' : 'c-dim'); lastOut = k; };
       for (var i = 0; i < lines.length && count < max; i++) {
         re.lastIndex = 0;
         var m = re.test(lines[i]);
-        if (m === !!o.f.v) continue;
+        if (m === !!o.f.v) { if (after > 0 && !o.f.c) { ctxLine(i); after--; } continue; }
         count++; hit = true;
+        if ((A || Bc) && !o.f.c && !(isBin && !o.f.a)) {
+          var from = Math.max(lastOut + 1, i - Bc);
+          if (lastOut >= 0 && from > lastOut + 1) ctx.out.text('--', ctx.piped ? '' : 'c-faint');
+          for (var k = from; k < i; k++) ctxLine(k);
+          lastOut = i; after = A;
+        }
         if (isBin && !o.f.a) { if (!o.f.c) ctx.out.text('grep: ' + label + ': binary file matches'); break; }
         if (o.f.c) continue;
         var pre = (multi ? label + ':' : '') + (o.f.n ? (i + 1) + ':' : '');
@@ -454,12 +456,15 @@
   def('logout', { cat: 'system', help: 'log out, then log back in under another name', usage: 'logout' }, function (ctx) {
     LX.authlog.push(LX.logTime() + ' ' + LX.HOST + ' login[812]: pam_unix(login:session): session closed for user ' + LX.USER);
     LX.store.set('user', null);
+    var w = LX.store.get('wtmp', []);
+    if (w.length && !w[w.length - 1].end) { w[w.length - 1].end = Date.now(); LX.store.set('wtmp', w); }
     ctx.out.text('logout', 'c-dim');
     LX.afterRun = function () { LX.ui.out.textContent = ''; LX.startSession(false); };
   });
   LX.cmds.exit = LX.cmds.logout; LX.cmds.login = LX.cmds.logout;
   def('sudo', { cat: 'system', help: 'you know what this does', hidden: true }, function (ctx) {
     var cmd = ctx.args.join(' ');
+    if (cmd === 'make me a sandwich') return ctx.out.text('okay.');
     LX.authlog.push(LX.logTime() + ' ' + LX.HOST + ' sudo:  ' + LX.USER + ' : user NOT in sudoers ; TTY=pts/1 ; PWD=' + LX.fs.cwd + ' ; USER=root ; COMMAND=' + (cmd || '/bin/sh'));
     ctx.out.html(span('c-red', LX.USER + ' is not in the sudoers file. this incident will be reported.'));
     ctx.out.html(span('c-dim', '(it actually was. see ') + LX.cmdLink('tail -n 3 /var/log/auth.log', '/var/log/auth.log', 'c-amber') + span('c-dim', ')'));

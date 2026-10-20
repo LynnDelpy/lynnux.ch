@@ -130,7 +130,7 @@ audio{display:block;margin:6px 0;max-width:100%;filter:invert(.9) hue-rotate(180
 #gui .msg{font-size:12px;min-height:1.2em}
 
 /* ---------- overlay (stegsolve, spectrogram, ...) ---------- */
-#overlay{position:fixed;inset:0;z-index:100;background:rgba(6,7,9,.97);display:flex;flex-direction:column}
+#overlay{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column}
 #overlay[hidden]{display:none}
 .ov-head{display:flex;gap:14px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;flex-wrap:wrap}
 #ov-title{color:var(--amber);font-weight:700}
@@ -143,6 +143,39 @@ audio{display:block;margin:6px 0;max-width:100%;filter:invert(.9) hue-rotate(180
 .ov-ctrl{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .ov-ctrl button{background:var(--panel);border:1px solid var(--line);color:var(--fg);padding:6px 14px;cursor:pointer;font-size:13px}
 .ov-ctrl button:hover,.ov-ctrl button:active{border-color:var(--amber);color:var(--amber)}
+
+/* ---------- pager (man, less) ---------- */
+#ov-body.pager-mode{justify-content:flex-start;align-items:stretch;padding:0;gap:0;overflow:hidden}
+.pager{flex:1;overflow:auto;padding:18px max(16px,calc((100% - 860px) / 2)) 40px;outline:0;text-align:left}
+.pager-status{background:var(--fg);color:var(--bg);font-size:13px;padding:2px 10px;white-space:nowrap;overflow:hidden}
+.pager-text{white-space:pre-wrap;word-break:break-word;font:inherit;margin:0}
+.man{font-size:14.5px;line-height:1.55}
+.man-hf{display:flex;justify-content:space-between;color:var(--dim);margin:0 0 18px;gap:12px}
+.man-hf:last-child{margin:26px 0 0}
+.man h3{color:var(--amber);font-size:14.5px;font-weight:700;margin:16px 0 4px}
+.man-b{margin-left:7ch}
+.man-b p{margin:0 0 10px}
+.man-b p.pre{white-space:pre-wrap}
+.man b{color:var(--fg)}
+.man code{color:var(--cyan)}
+.man-opts{display:grid;grid-template-columns:max-content 1fr;gap:4px 2ch;margin-left:7ch}
+.man-opts dt{color:var(--green);font-weight:700;white-space:nowrap}
+.man-ex{margin-bottom:8px}
+.man-ex code{cursor:pointer;border-bottom:1px dotted transparent}
+.man-ex code:hover{border-bottom-color:currentColor}
+.man-ex div{color:var(--dim);margin-left:2ch}
+.man-see{color:var(--cyan);cursor:pointer}
+.man-see:hover{text-decoration:underline}
+@media (max-width:720px){.man-b,.man-opts{margin-left:2ch}.man-opts{grid-template-columns:1fr}.man-opts dd{margin:0 0 6px 2ch}}
+
+/* ---------- htop ---------- */
+#ov-body.top-mode{justify-content:flex-start;align-items:stretch}
+pre.htop{align-self:stretch;margin:0;font:inherit;font-size:13px;line-height:1.35;overflow:auto;text-align:left;white-space:pre}
+
+/* ---------- easter eggs ---------- */
+.panic{position:fixed;inset:0;z-index:300;background:#000;color:#d8d8d8;font-size:13px;line-height:1.45;padding:18px;white-space:pre-wrap;overflow:hidden}
+#tape.pride{background:linear-gradient(to bottom,#D62800 0 20%,#FF9B56 20% 40%,#FFFFFF 40% 60%,#D462A6 60% 80%,#A40062 80%);color:#141414}
+#tape.pride b{color:#141414}
 
 /* ---------- login popup ---------- */
 .login{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;padding:16px;

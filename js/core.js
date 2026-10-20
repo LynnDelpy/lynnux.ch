@@ -161,7 +161,11 @@ LX.fs = {
 LX.open = function (ctx, path, cmd) {
   if (path === undefined) { ctx.out.err(cmd + ': missing file operand'); return null; }
   var abs = LX.fs.norm(path), n = LX.fs.get(abs);
-  if (!n) { ctx.out.err(cmd + ": cannot open '" + path + "': No such file or directory"); return null; }
+  if (!n) {
+    ctx.out.err(cmd + ": cannot open '" + path + "': No such file or directory");
+    if (/^(\.?\/)?flag(\.txt)?$/i.test(path)) ctx.out.text('(flags here are earned, not catted. try `cases`)', 'c-dim');
+    return null;
+  }
   if (n.t === 'd') { ctx.out.err(cmd + ': ' + path + ': Is a directory'); return null; }
   if (n.denied) { ctx.out.err(cmd + ': ' + path + ': Permission denied'); return null; }
   return { abs: abs, node: n, name: abs.slice(abs.lastIndexOf('/') + 1) };
@@ -215,20 +219,27 @@ TermOut.prototype.bytes = function (u8, hint) {
   this.line(LX.span('c-dim', '[' + u8.length + ' bytes of binary: ' + LX.magic(u8).split(',')[0] + '] redirect it to a file, e.g. ') + LX.span('c-amber', (hint || 'cmd') + ' > out.bin'));
 };
 
-function CapOut(quietErr) { this.buf = []; this.failed = false; this.quietErr = quietErr; }
-CapOut.prototype.text = function (s) { this.buf.push(String(s)); };
-CapOut.prototype.html = function (h) { this.buf.push(LX.strip(h)); };
+// captures output for pipes and redirects. text and binary can mix: as soon as any binary
+// arrives everything is kept as raw bytes, so `cat a.png notes.txt > b.png` stays intact
+function CapOut(quietErr) { this.buf = []; this.chunks = []; this.binary = false; this.failed = false; this.quietErr = quietErr; }
+CapOut.prototype.text = function (s) { s = String(s); this.buf.push(s); this.chunks.push(new TextEncoder().encode(s + '\n')); };
+CapOut.prototype.html = function (h) { this.text(LX.strip(h)); };
 CapOut.prototype.pre = CapOut.prototype.html;
 CapOut.prototype.line = CapOut.prototype.html;
 CapOut.prototype.el = function () { };
-CapOut.prototype.bytes = function (u8) {
-  if (this.binData) { var m = new Uint8Array(this.binData.length + u8.length); m.set(this.binData); m.set(u8, this.binData.length); this.binData = m; }
-  else this.binData = u8;
-};
+CapOut.prototype.bytes = function (u8) { this.binary = true; this.chunks.push(u8); };
 CapOut.prototype.err = function (s) { this.failed = true; if (!this.quietErr) LX.term.err(s); };
 CapOut.prototype.capturing = true;
+CapOut.prototype.all = function () {
+  var n = 0, i;
+  for (i = 0; i < this.chunks.length; i++) n += this.chunks[i].length;
+  var out = new Uint8Array(n), o = 0;
+  for (i = 0; i < this.chunks.length; i++) { out.set(this.chunks[i], o); o += this.chunks[i].length; }
+  return out;
+};
+Object.defineProperty(CapOut.prototype, 'binData', { get: function () { return this.binary ? this.all() : null; } });
 CapOut.prototype.value = function () {
-  if (this.binData) return new TextDecoder('latin1').decode(this.binData);
+  if (this.binary) return new TextDecoder('latin1').decode(this.all());
   return this.buf.length ? this.buf.join('\n') + '\n' : '';
 };
 
@@ -404,6 +415,10 @@ LX.run = async function (line, opts) {
   if (!opts.noHist && line[0] !== ' ') { LX.hist.push(line); LX.histTimes.push(Date.now()); }
   LX.histIdx = LX.hist.length;
   if (line.trim()[0] === '#') return;
+  if (/:\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/.test(line)) { // the classic fork bomb
+    LX.term.html(LX.span('c-red', 'zsh: fork bomb defused.') + LX.span('c-dim', ' 192 threads is a lot, but not infinite. (ulimit -u said no, nicely)'));
+    LX.status = 1; LX.ui.updatePrompt(); return;
+  }
   var chain;
   try { chain = LX.parse(line); } catch (e) { LX.term.err('zsh: ' + e.message); LX.status = 1; LX.ui.updatePrompt(); return; }
   var ctl = new AbortController();
@@ -471,6 +486,7 @@ LX.runPipe = async function (c, signal) {
     try {
       var abs = LX.fs.norm(LX.expandVars(c.redir.file)), ex = LX.fs.get(abs);
       if (abs === '/dev/null') return status;
+      if (abs === '/proc/sysrq-trigger' && LX.sysrq && LX.sysrq(stdin)) return 0;
       if (ex && ex.t === 'd') throw new Error(c.redir.file + ': Is a directory');
       if (stdinBytes) LX.fs.put(abs, { t: 'b', data: stdinBytes });
       else if (c.redir.append && ex && ex.t === 'f') {
