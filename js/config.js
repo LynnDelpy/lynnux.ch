@@ -2,7 +2,8 @@
 // any link set to null is hidden everywhere (terminal + plain view).
 
 var LX_CONFIG = {
-  host: 'lucia',        // the machine name, shown in the prompt
+  host: 'lynnux.ch',    // the machine name. visitors log in as <name>@lynnux.ch
+  owner: 'lucia',       // who owns the machine + the evidence (background lore only)
   domain: 'lynnux.ch',
   tagline: 'digital forensics · ctf · linux',
   location: 'switzerland',

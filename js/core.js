@@ -30,6 +30,13 @@ LX.fmtSize = function (n) {
   if (n < 1048576) return (n / 1024).toFixed(1) + 'K';
   return (n / 1048576).toFixed(1) + 'M';
 };
+LX.MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+LX.logTime = function (d) {
+  d = d || new Date();
+  return LX.MON[d.getMonth()] + ' ' + String(d.getDate()).padStart(2) + ' ' + d.toTimeString().slice(0, 8);
+};
+// what a login name has to look like (lowercase unix username)
+LX.NAME_RE = /^[a-z_][a-z0-9_-]{0,23}$/;
 LX.pad = function (s, n, right) { s = String(s); return right ? s.padStart(n) : s.padEnd(n); };
 LX.hex = function (n, w) { return n.toString(16).padStart(w || 2, '0'); };
 LX.$ = function (id) { return document.getElementById(id); };
@@ -389,6 +396,7 @@ LX.running = null;
 
 LX.run = async function (line, opts) {
   opts = opts || {};
+  if (LX.loginWait) return; // nobody is logged in yet
   line = line.replace(/\s+$/, '');
   if (!opts.silent) LX.term.echo(line);
   if (!line.trim()) return;
@@ -413,6 +421,8 @@ LX.run = async function (line, opts) {
     LX.running = null;
     LX.ui.busy(false);
     LX.ui.updatePrompt();
+    // commands like logout need the shell to be idle before they can take over
+    if (LX.afterRun) { var after = LX.afterRun; LX.afterRun = null; after(); }
   }
 };
 
@@ -486,20 +496,21 @@ LX.lev = function (a, b) {
 LX.ui = {
   out: LX.$('out'), input: LX.$('in'), hl: LX.$('in-hl'), pl: LX.$('pl'), ps1: LX.$('ps1'),
   suggestion: '',
-  // PROMPT='%F{214}%m%f %F{cyan}%~%f %(?.%F{green}.%F{red})❯%f '
+  // PROMPT='%F{214}%n%f@%F{214}%M%f %F{cyan}%~%f %(?.%F{green}.%F{red})❯%f '
   promptHTML: function () {
-    return '<span class="h">' + LX.esc(LX.HOST) + '</span> ' +
+    return '<span class="u">' + LX.esc(LX.USER) + '</span><span class="at">@</span><span class="h">' + LX.esc(LX.HOST) + '</span> ' +
       '<span class="p">' + LX.esc(LX.fs.display(LX.fs.cwd)) + '</span> <span class="' + (LX.status ? 'c-red' : 'c-green') + '">❯</span> ';
   },
   // repaint the highlighted mirror behind the input, plus the grey autosuggestion
   renderInput: function () {
     var ui = LX.ui, v = ui.input.value;
+    if (LX.loginWait) { ui.suggestion = ''; ui.hl.textContent = v; return; } // a name, not a command
     ui.suggestion = v && ui.input.selectionStart === v.length ? LX.suggest(v) : '';
     ui.hl.innerHTML = LX.highlight(v) + (ui.suggestion ? LX.span('c-dim', ui.suggestion.slice(v.length)) : '');
     ui.hl.scrollLeft = ui.input.scrollLeft;
   },
   updatePrompt: function () {
-    this.ps1.innerHTML = this.promptHTML();
+    if (!LX.loginWait) this.ps1.innerHTML = this.promptHTML();
     LX.$('st-cwd').textContent = LX.fs.display(LX.fs.cwd);
     if (LX.cases) LX.$('st-ev').textContent = 'evidence ' + LX.cases.solvedCount() + '/' + LX.cases.total();
   },
@@ -561,6 +572,13 @@ LX.histIdx = 0;
 LX.ui.input.addEventListener('keydown', function (e) {
   if (LX.keys.length || LX.running) return;
   var inp = LX.ui.input;
+  if (LX.loginWait) {
+    if (e.key === 'Enter') { e.preventDefault(); var name = inp.value; inp.value = ''; LX.ui.renderInput(); LX.loginWait(name); }
+    else if (e.key === 'Tab' || e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault();
+    else if (e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'u' || e.key === 'U')) { e.preventDefault(); inp.value = ''; }
+    requestAnimationFrame(LX.ui.renderInput);
+    return;
+  }
   var atEnd = inp.selectionStart === inp.value.length && inp.selectionEnd === inp.value.length;
   if (e.key === 'Enter') { e.preventDefault(); var v = inp.value; inp.value = ''; LX.ui.renderInput(); LX.run(v); return; }
   else if ((e.key === 'ArrowRight' || e.key === 'End') && atEnd && LX.ui.suggestion) { e.preventDefault(); inp.value = LX.ui.suggestion; }

@@ -5,8 +5,6 @@
   var esc = LX.esc, span = LX.span;
   LX.bootTime = new Date();
   document.querySelector('.st-badge').textContent = LX.HOST;
-  LX.buildFS();
-  LX.ui.updatePrompt();
 
   // ---- caution tape. two identical halves so the loop is seamless
   var unit = ['EVIDENCE', 'DO NOT CROSS', LX_CONFIG.domain.toUpperCase(), 'FORENSIC WORKSTATION', 'WRITE-BLOCKER ON', 'CASE FILES INSIDE'];
@@ -59,14 +57,79 @@
     }
     out.html(t(0.140117) + 'sha256 ' + esc((usb.sha256 || '').slice(0, 32)) + '... ' + span('c-green', 'verified ✓'));
     await wait(120);
-    out.html(t(0.160522) + 'loaded ' + LX.cases.total() + ' cases into ~/cases, guest session opened');
+    out.html(t(0.160522) + 'loaded ' + LX.cases.total() + ' cases into ~/cases');
     await wait(220);
+    document.removeEventListener('keydown', skipper);
+    document.removeEventListener('pointerdown', skipper);
+    LX.store.set('visited', true);
+    await LX.startSession(true);
+  }
+
+  // like getty: ask for a name until it is a valid one
+  function askLogin() {
+    var p = LX.HOST + ' login: ';
+    LX.ui.ps1.textContent = p;
+    return new Promise(function (resolve) {
+      LX.loginWait = function (v) {
+        var name = v.trim().toLowerCase();
+        LX.term.line(esc(p + v));
+        if (!name) return;
+        if (name === 'root') {
+          LX.authlog.push(LX.logTime() + ' ' + LX.HOST + ' login[812]: FAILED LOGIN 1 FROM tty1 FOR root, root login refused');
+          LX.term.err('Login incorrect');
+          LX.term.text('(nice try. root logins are disabled, and that attempt is now in /var/log/auth.log)', 'c-dim');
+          return;
+        }
+        if (!LX.NAME_RE.test(name)) {
+          LX.term.err('Login incorrect');
+          LX.term.text('(pick a name: a-z, 0-9, - and _, starting with a letter, max 24)', 'c-dim');
+          return;
+        }
+        LX.loginWait = null;
+        resolve(name);
+      };
+      LX.running = null;
+      LX.ui.busy(false);
+    });
+  }
+  function lastLoginStamp(d) {
+    var D = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return D[d.getDay()] + ' ' + LX.MON[d.getMonth()] + ' ' + String(d.getDate()).padStart(2) + ' ' + d.toTimeString().slice(0, 8) + ' ' + d.getFullYear();
+  }
+
+  // log in (or reuse the remembered name), build the home dir, run hyfetch, say hi.
+  // also used by `logout`, which calls it with remembered = false
+  LX.startSession = async function (remembered) {
+    var out = LX.term;
+    var name = remembered ? LX.store.get('user', null) : null;
+    if (name && !LX.NAME_RE.test(name)) name = null;
+    if (name) out.html(span('c-dim', LX.HOST + ' login: ') + esc(name) + span('c-dim', '  (remembered. `logout` to switch)'));
+    else {
+      out.text('');
+      out.html(span('c-arch', 'Arch Linux') + ' ' + esc(LX_CONFIG.machine.kernel) + ' (tty1)');
+      out.html(span('c-dim', 'pick any name. it only lives in your browser.'));
+      out.text('');
+      name = await askLogin();
+    }
+    LX.running = { abort: function () { } };
+    LX.ui.busy(true);
+    if (name !== LX.USER) { LX.hist.length = 0; LX.histTimes.length = 0; LX.histIdx = 0; }
+    LX.USER = name;
+    LX.HOME = '/home/' + name;
+    var last = LX.store.get('lastLogin', null), now = new Date();
+    LX.store.set('user', name);
+    LX.store.set('lastLogin', lastLoginStamp(now));
+    LX.authlog.push(LX.logTime(now) + ' ' + LX.HOST + ' login[812]: pam_unix(login:session): session opened for user ' + name + '(uid=1001) by LOGIN(uid=0)');
+    out.text(last ? 'Last login: ' + last + ' on tty1' : 'first login. welcome.', 'c-dim');
+    LX.status = 0;
+    LX.buildFS();
+    LX.ui.updatePrompt();
     out.text('');
     // ~/.zshrc ends with hyfetch, so every shell starts with pride
     LX.term.echo('hyfetch');
     LX.cmds.hyfetch.fn({ args: [], stdin: null, out: out, piped: false });
     out.text('');
-    out.html('welcome to ' + span('c-amber', LX.HOST) + ', a forensic workstation.' + span('c-dim', '  ' + LX_CONFIG.tagline + ' · ' + LX_CONFIG.location));
+    out.html('welcome, ' + span('c-amber', name) + '. this is ' + span('c-amber', LX.HOST) + ', a forensic workstation.' + span('c-dim', '  ' + LX_CONFIG.tagline + ' · ' + LX_CONFIG.location));
     out.text('');
     [['cases', 'real forensics challenges, solvable right here'], ['about', 'who runs this machine'], ['contact', 'links + how to reach me'], ['help', 'every command (there are a lot)']].forEach(function (r) {
       out.html('  ' + span('c-amber', '▸ ') + LX.cmdLink(r[0], LX.pad(r[0], 10), 'c-cyan') + span('c-dim', r[1]));
@@ -76,13 +139,10 @@
     var n = LX.cases.solvedCount();
     if (n) out.html(span('c-dim', 'welcome back. ') + span('c-green', n + '/' + LX.cases.total() + ' cases closed') + span('c-dim', ' so far.'));
     out.text('');
-    LX.store.set('visited', true);
-    document.removeEventListener('keydown', skipper);
-    document.removeEventListener('pointerdown', skipper);
     LX.running = null;
     LX.booted = true;
     LX.ui.busy(false);
     LX.ui.updatePrompt();
-  }
+  };
   boot();
 })();

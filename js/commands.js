@@ -74,7 +74,7 @@
         entries.forEach(function (e) {
           var nd = e[1], ro = nd.ro || !LX.fs.writable(abs);
           var perm = (nd.t === 'd' ? 'd' : nd.t === 'l' ? 'l' : '-') + (nd.t === 'l' ? 'rwxrwxrwx' : ro ? (nd.t === 'd' ? 'r-xr-xr-x' : 'r--r--r--') : (nd.t === 'd' ? 'rwxr-xr-x' : 'rw-r--r--'));
-          var owner = nd.src || abs.indexOf(LX.HOME + '/cases') === 0 ? LX.pad(LX.HOST, 8) + ' evidence' : abs.indexOf('/home') === 0 ? 'guest    guest   ' : 'root     root    ';
+          var owner = nd.src || abs.indexOf(LX.HOME + '/cases') === 0 ? LX.pad(LX_CONFIG.owner, 8) + ' evidence' : abs.indexOf('/home') === 0 ? LX.pad(LX.USER, 8) + ' ' + LX.pad(LX.USER, 8) : 'root     root    ';
           var sz = nd.t === 'd' ? 4096 : nd.t === 'l' ? nd.url.length : LX.fs.size(nd);
           var line = perm + ' 1 ' + owner + ' ' + LX.pad(o.f.h ? LX.fmtSize(sz) : sz, 7, true) + ' ' + lsDate(nd.mtime) + ' ';
           var name = LX.lsName(nd, e[0], e[2]);
@@ -451,14 +451,16 @@
       else ctx.out.err(c + ' not found');
     });
   });
-  def('exit', { cat: 'system', help: 'leave', hidden: true }, function (ctx) {
-    ctx.out.html(span('c-amber', 'you cannot log out of a crime scene.') + span('c-dim', ' (closing the tab works, i will not tell anyone)'));
+  def('logout', { cat: 'system', help: 'log out, then log back in under another name', usage: 'logout' }, function (ctx) {
+    LX.authlog.push(LX.logTime() + ' ' + LX.HOST + ' login[812]: pam_unix(login:session): session closed for user ' + LX.USER);
+    LX.store.set('user', null);
+    ctx.out.text('logout', 'c-dim');
+    LX.afterRun = function () { LX.ui.out.textContent = ''; LX.startSession(false); };
   });
-  LX.cmds.logout = LX.cmds.exit;
+  LX.cmds.exit = LX.cmds.logout; LX.cmds.login = LX.cmds.logout;
   def('sudo', { cat: 'system', help: 'you know what this does', hidden: true }, function (ctx) {
     var cmd = ctx.args.join(' ');
-    var d = new Date(), ts = MON[d.getMonth()] + ' ' + String(d.getDate()).padStart(2) + ' ' + d.toTimeString().slice(0, 8);
-    LX.authlog.push(ts + ' ' + LX.HOST + ' sudo:  ' + LX.USER + ' : user NOT in sudoers ; TTY=pts/1 ; PWD=' + LX.fs.cwd + ' ; USER=root ; COMMAND=' + (cmd || '/bin/sh'));
+    LX.authlog.push(LX.logTime() + ' ' + LX.HOST + ' sudo:  ' + LX.USER + ' : user NOT in sudoers ; TTY=pts/1 ; PWD=' + LX.fs.cwd + ' ; USER=root ; COMMAND=' + (cmd || '/bin/sh'));
     ctx.out.html(span('c-red', LX.USER + ' is not in the sudoers file. this incident will be reported.'));
     ctx.out.html(span('c-dim', '(it actually was. see ') + LX.cmdLink('tail -n 3 /var/log/auth.log', '/var/log/auth.log', 'c-amber') + span('c-dim', ')'));
   });

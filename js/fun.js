@@ -100,13 +100,13 @@
       ['Trace (you)', you[0] + you[1], esc(you[0]) + span('c-dim', you[1])]
     ].filter(Boolean);
     if (ctx.piped) { // like the real one: no logo, no colours when piped
-      ctx.out.text(LX.HOST);
+      ctx.out.text(LX.USER + '@' + LX.HOST);
       rows.forEach(function (r) { if (Array.isArray(r)) ctx.out.text(r[0] + ': ' + r[1]); });
       return;
     }
     // on phones only the essentials are shown (css hides .ff-x), the rest is for bigger screens
     var EXTRA = { Host: 1, Shell: 1, Display: 1, WM: 1, Theme: 1, Customized: 1, Terminal: 1, Swap: 1, 'Disk (/)': 1, Power: 1, Temp: 1, Hashrate: 1, Carved: 1, Deleted: 1, Sleep: 1, 'Trace (you)': 1 };
-    var info = [['<span class="t">' + esc(LX.HOST) + '</span>'], [span('c-faint', '─'.repeat(Math.max(5, LX.HOST.length)))]];
+    var info = [['<span class="t">' + esc(LX.USER) + '</span>@<span class="t">' + esc(LX.HOST) + '</span>'], [span('c-faint', '─'.repeat(LX.USER.length + 1 + LX.HOST.length))]];
     rows.forEach(function (r) {
       if (r === 'forensics') info.push([span('c-faint', '─── ') + span('c-amber', 'forensics') + span('c-faint', ' ' + '─'.repeat(20))]);
       else info.push(['<span class="k">' + esc(r[0]) + '</span>: ' + (r[2] || esc(r[1])), EXTRA[r[0]] ? 'ff-x' : '']);
