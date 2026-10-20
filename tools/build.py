@@ -32,8 +32,8 @@ MACHINE_KEYS = ['OS', 'KERNEL', 'HOST', 'DISPLAY', 'CPU', 'GPU', 'MEM', 'SWAP', 
 KNOWN = {'SITE_NAME', 'DOMAINS', 'DESCRIPTION', 'TAGLINE', 'LOCATION', 'OWNER', 'FLAG_PREFIX', 'CNAME', 'EMAIL', 'DISCORD', 'TEAMS', 'ABOUT', 'HYFETCH_PRESET', 'WEBROOT'}
 HOST_RE = re.compile(r'^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$')
 USER_RE = re.compile(r'^[a-z_][a-z0-9_-]{0,23}$')
-# what gets deployed. an allowlist on purpose: tools/ has the flag templates, and with
-# them plus the hashes in js/evidence.gen.js every flag brute-forces in under a second
+# what gets deployed. an allowlist on purpose: nothing else in the repo is secret,
+# but build tools, site.env and whatever gets added later have no business being served
 PUBLIC = ['index.html', '404.html', 'favicon.svg', '_headers', 'CNAME', 'css', 'js', 'assets', 'evidence']
 
 

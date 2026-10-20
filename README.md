@@ -39,13 +39,23 @@ the plaintext flags only exist in two places:
 1. inside the evidence files (that's the point)
 2. `flags.json`, which is **gitignored**. back it up somewhere safe.
 
-the site only ships `sha256(lowercase(flag))` in `js/evidence.gen.js`, and
-`submit` compares hashes locally. reading the js gives you nothing.
+the site only ships a hash of each flag in `js/evidence.gen.js`, and
+`submit` compares hashes locally. your guess never leaves the browser.
 
-**but only if `tools/` stays private.** `build_evidence.py` holds the flag
-templates, and each flag only has 4 random characters on top (38k guesses).
-templates + the hashes = every flag in under a second. so: keep the repo
-private, and serve `dist/` (see below), never the whole repo.
+the threat model assumes **everything in this repo is public**, including
+`tools/build_evidence.py` with the flag templates (`bit_planes_tell_tales_...`).
+so the templates are no secret. two things are:
+
+- **10 random characters** per flag (from 14 symbols, no 0/1 so image flags
+  stay readable): about 2.9 * 10^11 possibilities each
+- a **slow hash**: PBKDF2-HMAC-SHA256, 600,000 rounds, random salt. one submit
+  costs about 0.3 s in a browser, which is nothing for a player and a lot for
+  a brute forcer
+
+together that is roughly 4 months per flag on one high-end GPU, versus solving
+the case in 20 minutes. (the first version had 4 random characters and plain
+sha256: all 7 flags fell in 0.17 s from the public files. those flags are
+retired, and the generator replaces flags that weak by itself.)
 
 ## run it locally
 
@@ -119,7 +129,9 @@ python3 tools/build_evidence.py --new    # roll new random flags
 ```
 
 this regenerates `evidence/*` and `js/evidence.gen.js`. if `flags.json` doesn't
-exist it creates one.
+exist it creates one, and any flag in it that is weaker than the current rules
+(old short suffix, other `FLAG_PREFIX`) gets replaced. same flags in, same bytes
+out, so a rebuild only shows up in git when something really changed.
 
 ## adding a case
 
@@ -133,10 +145,11 @@ that's it, the folder, briefing, downloads and plain view all build themselves.
 
 ## deploying
 
-**don't serve the repo root.** `python3 tools/build.py --dist` copies only what
-visitors need into `dist/` (an allowlist: html, css, js, fonts, evidence).
-`tools/`, `site.env`, the README and anything you add later stay out unless
-you add them to `PUBLIC` in `tools/build.py`. serve `dist/`, nothing else.
+**serve `dist/`, not the repo root.** `python3 tools/build.py --dist` copies only
+what visitors need into `dist/` (an allowlist: html, css, js, fonts, evidence).
+nothing in the repo is secret, but there is no reason to serve build tools, and
+anything you add later stays out unless you add it to `PUBLIC` in
+`tools/build.py`. a smaller surface is a smaller surface.
 
 ### your own server (caddy or nginx)
 
@@ -185,9 +198,9 @@ add every domain as a custom domain. they read `_headers` directly.
 
 ### github pages (not recommended)
 
-"deploy from branch" publishes the **whole repo**, `tools/` included, so the
-flags leak (see "how flags stay secret"). and it allows only **one** custom
-domain (`CNAME=` in `site.env`), so `.li` could only redirect to `.ch`.
+it allows only **one** custom domain (`CNAME=` in `site.env`), so `.li` could
+only redirect to `.ch`. "deploy from branch" also serves the whole repo instead
+of `dist/`, and `_headers` is ignored.
 
 ### ci
 

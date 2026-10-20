@@ -41,8 +41,11 @@
       sb.type = 'button';
       async function go() {
         var v = inp.value.trim();
-        if (!v) return;
-        var id = await LX.cases.check(v);
+        if (!v || sb.disabled) return;
+        // the hash is slow on purpose (up to a second or two on a phone), so say so
+        sb.disabled = true; msg.className = 'msg c-dim'; msg.textContent = 'checking...';
+        var id;
+        try { id = await LX.cases.check(v); } finally { sb.disabled = false; msg.textContent = ''; }
         if (id) {
           LX.cases.markSolved(id);
           LX.ui.toast('CASE LX-' + id + ' CLOSED');
