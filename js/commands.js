@@ -162,9 +162,51 @@
       try { LX.fs.put(p, LX.F('')); } catch (e) { ctx.out.err('touch: ' + e.message); }
     });
   });
+  // GNU rm's long options, with getopt's unambiguous prefixes: --no works, --no-preserve-roots does not
+  var RM_LONG = { force: '-f', recursive: '-r', verbose: '-v', interactive: '-i', dir: '', 'one-file-system': '', 'preserve-root': '', 'no-preserve-root': '' };
+  LX.rmPlan = function (args) {
+    var p = { noPreserve: false }, short = [];
+    for (var i = 0; i < args.length; i++) {
+      var a = args[i];
+      if (a === '--') { short = short.concat(args.slice(i)); break; }
+      if (a.slice(0, 2) !== '--') { short.push(a); continue; }
+      var name = a.slice(2), hits = Object.keys(RM_LONG).filter(function (o) { return o.indexOf(name) === 0; });
+      if (RM_LONG[name] !== undefined) hits = [name];
+      if (hits.length !== 1) { p.bad = a; return p; }
+      if (hits[0] === 'no-preserve-root' || hits[0] === 'preserve-root') p.noPreserve = hits[0] === 'no-preserve-root';
+      else if (RM_LONG[hits[0]]) short.push(RM_LONG[hits[0]]);
+    }
+    p.o = LX.opts(short, { flags: 'rfRivdI' });
+    p.recursive = !!(p.o.f.r || p.o.f.R);
+    var abs = p.o.rest.map(function (x) { return LX.fs.norm(x); });
+    var top = Object.keys(LX.fs.root.c).map(function (k) { return '/' + k; });
+    p.hitsRoot = abs.indexOf('/') >= 0;
+    p.allTop = top.every(function (t) { return abs.indexOf(t) >= 0; }); // what rm -rf /* expands to
+    p.failsafe = p.recursive && p.hitsRoot && !p.noPreserve;
+    p.wipe = p.recursive && (p.hitsRoot && p.noPreserve || p.allTop);
+    return p;
+  };
+  LX.rmBadOption = function (ctx, bad) {
+    ctx.out.err("rm: unrecognized option '" + bad + "'");
+    ctx.out.err("Try 'rm --help' for more information.");
+    if (/^--no-preserve-root./.test(bad)) ctx.out.text("(so close. it's --no-preserve-root, singular.)", 'c-dim');
+    return 1;
+  };
   def('rm', { cat: 'nav', help: 'remove files', usage: 'rm [-rf] <path...>' }, function (ctx) {
-    var o = LX.opts(ctx.args, { flags: 'rfRiv' });
+    var p = LX.rmPlan(ctx.args), o = p.o;
+    if (p.bad) return LX.rmBadOption(ctx, p.bad);
     if (!o.rest.length) return ctx.out.err('rm: missing operand');
+    // word for word what GNU rm says. root gets it too
+    if (p.failsafe) {
+      ctx.out.err("rm: it is dangerous to operate recursively on '/'");
+      ctx.out.err('rm: use --no-preserve-root to override this failsafe');
+      return 1;
+    }
+    if (p.wipe) {
+      Object.keys(LX.fs.root.c).sort().forEach(function (k) { ctx.out.err("rm: cannot remove '/" + k + "': Permission denied"); });
+      ctx.out.text('(you are a guest. wiping a system takes root. not that root would help.)', 'c-dim');
+      return 1;
+    }
     o.rest.forEach(function (p) {
       var abs = LX.fs.norm(p);
       if (abs === '/' || abs === '/home' || abs === LX.HOME) {
@@ -463,8 +505,19 @@
   });
   LX.cmds.exit = LX.cmds.logout; LX.cmds.login = LX.cmds.logout;
   def('sudo', { cat: 'system', help: 'you know what this does', hidden: true }, function (ctx) {
-    var cmd = ctx.args.join(' ');
+    var cmd = ctx.args.join(' '), i = 0;
     if (cmd === 'make me a sandwich') return ctx.out.text('okay.');
+    while (i < ctx.args.length && ctx.args[i][0] === '-') i++; // sudo -E, sudo -H, ...
+    var what = ctx.args[i], rest = ctx.args.slice(i + 1);
+    // sudo rm -rf / --no-preserve-root, sudo rm -rf /*: the show, in extra.js
+    if (what === 'rm') {
+      var p;
+      try { p = LX.rmPlan(rest); } catch (e) { return ctx.out.err('rm: ' + e.message); }
+      if (p.bad) return LX.rmBadOption(ctx, p.bad);
+      if (p.wipe || p.failsafe) return LX.nuke(ctx, p, ['rm'].concat(rest));
+    }
+    // the disk wipers tell their own joke, sudo or not
+    if (LX.diskCmd && LX.diskCmd(what)) return LX.cmds[what].fn(Object.assign({}, ctx, { name: what, args: rest, argv: ctx.args.slice(i) }));
     LX.authlog.push(LX.logTime() + ' ' + LX.HOST + ' sudo:  ' + LX.USER + ' : user NOT in sudoers ; TTY=pts/1 ; PWD=' + LX.fs.cwd + ' ; USER=root ; COMMAND=' + (cmd || '/bin/sh'));
     ctx.out.html(span('c-red', LX.USER + ' is not in the sudoers file. this incident will be reported.'));
     ctx.out.html(span('c-dim', '(it actually was. see ') + LX.cmdLink('tail -n 3 /var/log/auth.log', '/var/log/auth.log', 'c-amber') + span('c-dim', ')'));

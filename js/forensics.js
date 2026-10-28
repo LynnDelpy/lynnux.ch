@@ -397,6 +397,7 @@
     var data = b.slice(start, end), t = (Math.random() * 0.002 + 0.0003);
     if (kv.of) {
       var target = kv.of, abs = LX.fs.norm(target), dir = abs.slice(0, abs.lastIndexOf('/')) || '/';
+      if (LX.isDisk(abs)) return LX.diskJoke(ctx, 'dd', abs); // dd if=/dev/zero of=/dev/sdb
       if (!LX.fs.writable(dir)) { abs = LX.save(ctx, abs.slice(abs.lastIndexOf('/') + 1), data); }
       else LX.fs.put(abs, { t: 'b', data: data });
     } else if (ctx.piped) { ctx.out.bytes(data); return; }

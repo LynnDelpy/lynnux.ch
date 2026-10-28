@@ -712,20 +712,26 @@
     }, true);
   })();
 
-  // echo c > /proc/sysrq-trigger: a kernel panic. for three seconds.
-  LX.sysrq = function (data) {
-    if ((data || '').trim() !== 'c') return false;
-    var up = ((Date.now() - LX.bootTime) / 1000 + 4242).toFixed(6), L = [
-      'sysrq: Trigger a crash', 'Kernel panic - not syncing: sysrq triggered crash',
-      'CPU: 137 UID: 1001 PID: 6001 Comm: zsh Tainted: P           O       ' + LX_CONFIG.machine.kernel + ' #1',
-      'Hardware name: ' + (LX_CONFIG.machine.host || LX.HOST), 'Call Trace:', ' <TASK>', ' dump_stack_lvl+0x5d/0x80', ' panic+0x118/0x2f0', ' sysrq_handle_crash+0x1a/0x20',
-      ' __handle_sysrq.cold+0x4c/0x118', ' write_sysrq_trigger+0x5f/0x80', ' proc_reg_write+0x5a/0xa0', ' vfs_write+0xf5/0x430', ' ksys_write+0x6f/0xf0',
-      ' do_syscall_64+0x82/0x190', ' entry_SYSCALL_64_after_hwframe+0x76/0x7e', ' </TASK>', 'Kernel Offset: 0x1337000 from 0xffffffff81000000',
-      '---[ end Kernel panic - not syncing: sysrq triggered crash ]---'];
+  // the kernel panic screen. shared by sysrq and the rm -rf / show
+  function panicScreen(pre, reason, who, trace) {
+    var up = ((Date.now() - LX.bootTime) / 1000 + 4242).toFixed(6);
+    var L = pre.concat(['Kernel panic - not syncing: ' + reason,
+      'CPU: 137 ' + who + ' Tainted: P           O       ' + LX_CONFIG.machine.kernel + ' #1',
+      'Hardware name: ' + (LX_CONFIG.machine.host || LX.HOST), 'Call Trace:', ' <TASK>', ' dump_stack_lvl+0x5d/0x80', ' panic+0x118/0x2f0'],
+      trace, [' do_syscall_64+0x82/0x190', ' entry_SYSCALL_64_after_hwframe+0x76/0x7e', ' </TASK>', 'Kernel Offset: 0x1337000 from 0xffffffff81000000',
+      '---[ end Kernel panic - not syncing: ' + reason + ' ]---']);
     var d = document.createElement('div');
     d.className = 'panic';
     d.textContent = L.map(function (l) { return '[' + LX.pad(up, 12, true) + '] ' + l; }).join('\n');
     document.body.appendChild(d);
+    return d;
+  }
+
+  // echo c > /proc/sysrq-trigger: a kernel panic. for three seconds.
+  LX.sysrq = function (data) {
+    if ((data || '').trim() !== 'c') return false;
+    var d = panicScreen(['sysrq: Trigger a crash'], 'sysrq triggered crash', 'UID: 1001 PID: 6001 Comm: zsh',
+      [' sysrq_handle_crash+0x1a/0x20', ' __handle_sysrq.cold+0x4c/0x118', ' write_sysrq_trigger+0x5f/0x80', ' proc_reg_write+0x5a/0xa0', ' vfs_write+0xf5/0x430', ' ksys_write+0x6f/0xf0']);
     LX.keys.push(function () { return true; });
     setTimeout(function () {
       d.remove(); LX.keys.pop();
@@ -734,4 +740,114 @@
     }, 3200);
     return true;
   };
+
+  // sudo rm -rf / --no-preserve-root, sudo rm -rf /*. everybody tries it eventually.
+  // a deletion scroll through the real virtual disk, the shell falling apart, a panic,
+  // and then the twist: nothing was deleted, and the attempt is evidence now.
+  // ctrl+c skips straight to the twist (no LX.keys handler, so it gets through)
+  LX.nuke = async function (ctx, p, argv) {
+    var term = LX.term, who = LX.USER, n = 0, panel = null, skipped = false;
+    term.html(span('c-dim', ctx.name === 'doas' ? 'doas (' + who + '@' + LX.HOST + ') password: ' : '[sudo] password for ' + who + ': ') + '••••••••' + span('c-faint', '  (autofilled. it was hunter2.)'));
+    await ctx.sleep(500);
+    term.text(who + ' is not in the sudoers file.', 'c-red');
+    term.text('...but ' + (p.failsafe ? 'rm -rf /' : p.allTop ? 'rm -rf /*' : 'rm -rf / --no-preserve-root') + ' is a special occasion. go ahead, just this once.', 'c-dim');
+    // the log does not do exceptions: it says what really happened
+    var log = LX.logTime() + ' ' + LX.HOST + ' sudo:  ' + who + ' : user NOT in sudoers ; TTY=pts/1 ; PWD=' + LX.fs.cwd + ' ; USER=root ; COMMAND=/usr/bin/' + argv.join(' ');
+    LX.authlog.push(log);
+    if (p.failsafe) {
+      await ctx.sleep(400);
+      term.err("rm: it is dangerous to operate recursively on '/'");
+      term.err('rm: use --no-preserve-root to override this failsafe');
+      term.text('(even root gets that one. there is a flag for it, if you are sure.)', 'c-faint');
+      return 1;
+    }
+    n = LX.store.get('nukes', 0) + 1; // only the real thing counts, not the failsafe
+    LX.store.set('nukes', n);
+    // what rm -v would print, in readdir order. some things do not go quietly
+    var lines = [];
+    (function walk(node, path) {
+      var gone = true;
+      Object.keys(node.c || {}).sort().forEach(function (k) {
+        var abs = path + '/' + k, ch = node.c[k], ok = ch.t === 'd' ? walk(ch, abs) : true, why = null;
+        if (abs === '/dev/sdb') why = "that is the suspect's usb stick. it is evidence.";
+        else if (abs.indexOf(LX.HOME + '/cases') === 0) why = 'write-blocker says no';
+        else if (abs.indexOf('/proc') === 0) why = 'Operation not permitted';
+        else if (abs === '/var/log/auth.log') why = 'logs are the first thing an attacker deletes. and the first thing we back up.';
+        else if (!ok) why = 'Directory not empty';
+        if (why) { gone = false; lines.push(['c-red', "rm: cannot remove '" + abs + "': " + why]); }
+        else lines.push(['', 'removed ' + (ch.t === 'd' ? 'directory ' : '') + "'" + abs + "'"]);
+      });
+      return gone;
+    })(LX.fs.root, '');
+    try {
+      await ctx.sleep(450);
+      var step = Math.ceil(lines.length / 32);
+      for (var i = 0; i < lines.length; i += step) {
+        lines.slice(i, i + step).forEach(function (l) { term.text(l[1], l[0]); });
+        await ctx.sleep(45);
+      }
+      // the shell is still running. everything it would run is gone
+      var tries = [['ls', 'ls'], ['cat about.txt', 'cat'], ['help', 'help']];
+      for (var t = 0; t < tries.length; t++) {
+        await ctx.sleep(450);
+        term.echo(tries[t][0]);
+        term.err('zsh: command not found: ' + tries[t][1]);
+      }
+      await ctx.sleep(400);
+      document.body.classList.add('lx-dying');
+      await ctx.sleep(700);
+      // exitcode 0x7f00: init exited with 127, command not found. it deleted itself
+      panel = panicScreen(['systemd[1]: Failed to execute /usr/lib/systemd/systemd: No such file or directory'], 'Attempted to kill init! exitcode=0x00007f00', 'UID: 0 PID: 1 Comm: systemd',
+        [' do_exit.cold+0x15/0x15', ' do_group_exit+0x2d/0x90', ' __x64_sys_exit_group+0x14/0x20', ' x64_sys_call+0x1a7f/0x2110']);
+      await ctx.sleep(2600);
+    } catch (e) {
+      if (!e || e.name !== 'AbortError') throw e;
+      skipped = true;
+    } finally {
+      document.body.classList.remove('lx-dying');
+      if (panel) panel.remove();
+    }
+    var last = LX.hist.length - 1, sneaky = (LX.lastLine || '')[0] === ' ';
+    if (skipped) term.text('^C  (skipping to the end)', 'c-dim');
+    term.text('');
+    term.html(span('c-amber b', 'just kidding.') + span('c-dim', ' nothing was deleted. this is a forensic workstation.'));
+    term.html('  ' + span('c-green', 'write-blocker') + span('c-dim', '   0 bytes modified. the evidence was never mounted read-write.'));
+    term.html('  ' + span('c-cyan', 'and even if  ') + span('c-dim', '   rm only marks space as free. deleted is not gone. ') + LX.cmdLink('cd ~/cases/case-005 && cat BRIEFING.txt', 'case-005', 'c-amber') + span('c-dim', ' shows how.'));
+    term.text('');
+    term.text('your attempt is evidence now:');
+    term.html('  ' + LX.cmdLink('tail -n 2 /var/log/auth.log', '/var/log/auth.log', 'c-amber') + '  ' + span('c-dim', log));
+    if (sneaky) term.html('  ' + span('c-amber', '~/.zsh_history') + '     ' + span('c-dim', 'nothing. you started the line with a space (HIST_IGNORE_SPACE). sneaky. auth.log got you anyway.'));
+    else term.html('  ' + LX.cmdLink('tail -n 2 ~/.zsh_history', '~/.zsh_history', 'c-amber') + '     ' + span('c-dim', ': ' + Math.floor(LX.histTimes[last] / 1000) + ':0;' + LX.hist[last]));
+    term.html(span('c-dim', 'the analyst who builds your timeline says thanks.') + (n > 1 ? span('c-faint', '  (attempt #' + n + '. the write-blocker does not get tired.)') : ''));
+    return 1; // nothing was removed, so rm failed. `sudo rm -rf / && echo gone` stays quiet
+  };
+
+  // dd of=/dev/sdX, mkfs, wipefs, shred: the disk wipers
+  var DISK = /^\/dev\/(sd[a-z]+\d*|nvme\d+n\d+(p\d+)?|vd[a-z]+\d*|hd[a-z]+\d*|mmcblk\d+(p\d+)?)$/;
+  var WIPERS = ['shred', 'wipefs', 'mkfs', 'mkfs.ext4', 'mkfs.vfat', 'mkfs.fat', 'mkfs.btrfs', 'mkfs.xfs'];
+  LX.isDisk = function (abs) { return DISK.test(abs); };
+  LX.diskCmd = function (name) { return name === 'dd' || WIPERS.indexOf(name) >= 0; };
+  LX.diskJoke = function (ctx, cmd, dev) {
+    if (dev === '/dev/sdb') {
+      ctx.out.err(cmd + ": refusing to touch /dev/sdb: that is the suspect's usb stick. it is evidence.");
+      ctx.out.text('(overwriting evidence in front of a forensic analyst. bold. the write-blocker sits between you and it anyway.)', 'c-dim');
+    } else {
+      ctx.out.err(cmd + ': ' + dev + ': No such device');
+      ctx.out.text('(the system disk is a ' + LX_CONFIG.machine.disk + ' zfs pool, not a /dev/sdX. it is not taking your zeros.)', 'c-dim');
+    }
+    return 1;
+  };
+  WIPERS.forEach(function (name) {
+    def(name, { cat: 'system', hidden: true }, function (ctx) {
+      var t = ctx.args.filter(function (a) { return a[0] !== '-'; }), target = t[t.length - 1];
+      if (!target) return ctx.out.err(name + ': missing operand');
+      var abs = LX.fs.norm(target);
+      if (DISK.test(abs)) return LX.diskJoke(ctx, name, abs);
+      if (name !== 'shred') return ctx.out.err(name + ': ' + target + ': not a block device');
+      if (!LX.fs.get(abs)) return ctx.out.err('shred: ' + target + ': failed to open for writing: No such file or directory');
+      if (!LX.fs.writable(abs.slice(0, abs.lastIndexOf('/')) || '/')) return ctx.out.err('shred: ' + target + ': write-blocker says no. shredding evidence has a name: obstruction.');
+      ctx.out.text('shred: ' + target + ': pass 3/3 (random)...');
+      ctx.out.text('(on zfs that overwrote nothing: copy-on-write writes the new bytes somewhere else and the old blocks stay. the real man shred warns about exactly this.)', 'c-dim');
+    });
+  });
 })();

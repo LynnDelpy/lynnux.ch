@@ -410,6 +410,7 @@ LX.run = async function (line, opts) {
   opts = opts || {};
   if (LX.loginOpen) return; // nobody is logged in yet
   line = line.replace(/\s+$/, '');
+  LX.lastLine = line;
   if (!opts.silent) LX.term.echo(line);
   if (!line.trim()) return;
   // setopt HIST_IGNORE_SPACE: a leading space keeps a command out of the history

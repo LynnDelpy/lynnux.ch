@@ -64,7 +64,9 @@
       notes: 'compare the sha256 of the download with the one in BRIEFING.txt. matching hashes mean the evidence did not change on the way.', see: ['sha256sum', 'cases'] },
     cp: { d: 'copy files and directories', syn: 'cp [-rv] source... dest', desc: 'copying evidence into ~/work is allowed (and good practice). copying into ~/cases is not: write-blocker.', ex: [['cp ~/cases/case-003/lake.jpg ~/work/', 'work on a copy']], see: ['mv', 'rm'] },
     mv: { d: 'move or rename files', syn: 'mv source... dest', desc: 'evidence cannot be moved out of ~/cases. copy it instead.', see: ['cp'] },
-    rm: { d: 'remove files or directories', syn: 'rm [-rf] path...', desc: 'works in your home and ~/work. the write-blocker protects everything else.',
+    rm: { d: 'remove files or directories', syn: 'rm [OPTION]... path...', desc: 'works in your home and ~/work. the write-blocker protects everything else.',
+      opts: [['-f, --force', 'ignore missing files, never ask'], ['-r, -R, --recursive', 'remove directories and their contents'], ['-v, --verbose', 'say what is being removed'],
+        ['--preserve-root', "do not remove '/' (default)"], ['--no-preserve-root', "do not treat '/' specially"]],
       notes: 'on a real FAT or ext file system rm does not erase data. it marks the space as free. until something overwrites it, tools like `icat` and `foremost` get it back. see case-005.', see: ['fls', 'icat', 'foremost'] },
 
     // ---- text
