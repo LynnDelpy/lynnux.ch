@@ -75,6 +75,13 @@ LX.num = function (s, def) {
 };
 
 // ---------------------------------------------------------------- virtual fs
+// privilege. everyone starts as a guest. closing every case gets you into sudoers (LX.promote, cases.js)
+LX.rootStack = [];  // open root shells (sudo -i, sudo su, ...). exit pops one
+LX.sudoDepth = 0;   // > 0 while sudo runs a single command
+LX.isRoot = function () { return LX.sudoDepth > 0 || LX.rootStack.length > 0; };
+LX.isSudoer = function () { return !!LX.cases && LX.cases.solvedCount() === LX.cases.total(); };
+LX.whoami = function () { return LX.isRoot() ? 'root' : LX.USER; };
+
 function mkDir(children, meta) {
   var c = Object.create(null);
   for (var k in children) c[k] = children[k];
@@ -168,7 +175,7 @@ LX.open = function (ctx, path, cmd) {
     return null;
   }
   if (n.t === 'd') { ctx.out.err(cmd + ': ' + path + ': Is a directory'); return null; }
-  if (n.denied) { ctx.out.err(cmd + ': ' + path + ': Permission denied'); return null; }
+  if (n.denied && !LX.isRoot()) { ctx.out.err(cmd + ': ' + path + ': Permission denied'); return null; }
   return { abs: abs, node: n, name: abs.slice(abs.lastIndexOf('/') + 1) };
 };
 
@@ -357,7 +364,7 @@ LX.suggest = function (v) {
 
 LX.expandVars = function (s) {
   return s.replace(/\u0001(\w+|\?)\u0002/g, function (m, name) {
-    var env = { HOME: LX.HOME, USER: LX.USER, PWD: LX.fs.cwd, HOSTNAME: LX.HOST, SHELL: '/usr/bin/zsh', '0': 'zsh', ZSH_VERSION: '5.9', '?': String(LX.status), RANDOM: String(Math.floor(Math.random() * 32768)) };
+    var env = { HOME: LX.HOME, USER: LX.whoami(), PWD: LX.fs.cwd, HOSTNAME: LX.HOST, SHELL: '/usr/bin/zsh', '0': 'zsh', ZSH_VERSION: '5.9', '?': String(LX.status), RANDOM: String(Math.floor(Math.random() * 32768)) };
     return name in env ? env[name] : '';
   });
 };
@@ -516,8 +523,9 @@ LX.ui = {
   suggestion: '',
   // PROMPT='%F{214}%n%f@%F{214}%M%f %F{cyan}%~%f %(?.%F{green}.%F{red})❯%f '
   promptHTML: function () {
-    return '<span class="u">' + LX.esc(LX.USER) + '</span><span class="at">@</span><span class="h">' + LX.esc(LX.HOST) + '</span> ' +
-      '<span class="p">' + LX.esc(LX.fs.display(LX.fs.cwd)) + '</span> <span class="' + (LX.status ? 'c-red' : 'c-green') + '">❯</span> ';
+    var root = LX.rootStack.length > 0;
+    return '<span class="u' + (root ? ' root' : '') + '">' + LX.esc(root ? 'root' : LX.USER) + '</span><span class="at">@</span><span class="h">' + LX.esc(LX.HOST) + '</span> ' +
+      '<span class="p">' + LX.esc(LX.fs.display(LX.fs.cwd)) + '</span> <span class="' + (LX.status ? 'c-red' : 'c-green') + '">' + (root ? '#' : '❯') + '</span> ';
   },
   // repaint the highlighted mirror behind the input, plus the grey autosuggestion
   renderInput: function () {

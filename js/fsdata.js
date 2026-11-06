@@ -154,9 +154,31 @@ LX.buildFS = function () {
       'os-release': F('NAME="Arch Linux"\nPRETTY_NAME="Arch Linux"\nID=arch\nBUILD_ID=rolling\nVARIANT="forensic workstation"\nANSI_COLOR="38;2;23;147;209"\nHOME_URL="https://archlinux.org/"\nLOGO=archlinux-logo\n'),
       passwd: F('root:x:0:0:root:/root:/bin/bash\n' + C.owner + ':x:1000:1000::/home/' + C.owner + ':/usr/bin/zsh\n' +
         (LX.USER !== C.owner ? LX.USER + ':x:1001:1001:visitor:' + LX.HOME + ':/usr/bin/zsh\n' : '') + 'suspect_47:x:4747:4747:do not trust:/nonexistent:/usr/sbin/nologin\n'),
-      shadow: F('', { denied: true }),
+      // every account is locked: there is nothing to crack, the way to root is the cases
+      shadow: F('root:*:20300:0:99999:7:::\n' + C.owner + ':!:20300:0:99999:7:::\n' + LX.USER + ':!:20300:0:99999:7:::\nsuspect_47:!:20300::::::\n', { denied: true }),
+      sudoers: F('## /etc/sudoers on ' + LX.HOST + '. edit with visudo, never by hand.\nDefaults env_reset\nDefaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/bin"\nDefaults lecture=once\n\n' +
+        'root   ALL=(ALL:ALL) ALL\n%wheel ALL=(ALL:ALL) ALL\n\n## guests who close every case get a drop-in here, written by ' + C.owner + '.\n@includedir /etc/sudoers.d\n', { denied: true }),
+      'sudoers.d': D(LX.isSudoer() ? (function () { var d = {}; d[LX.USER] = F(LX.USER + ' ALL=(ALL:ALL) NOPASSWD: ALL\n', { denied: true }); return d; })() : {}, { denied: true }),
+      group: { t: 'f', get text() {
+        return 'root:x:0:\nwheel:x:10:' + C.owner + (LX.isSudoer() ? ',' + LX.USER : '') + '\n' + C.owner + ':x:1000:\n' + LX.USER + ':x:1001:\nevidence-ro:x:4747:' + C.owner + ',' + LX.USER + '\n';
+      } },
       'hosts': F('127.0.0.1  localhost\n127.0.1.1  ' + LX.HOST + '\n# 198.51.100.23  update.telemetry-cdn.example   <- blocked after case LX-004\n')
     }),
+    // root's home. only readable as root, which you get by closing every case
+    root: D({ README: F([
+      'hi ' + LX.USER + ',', '',
+      'you closed every case on this box. all ' + LX_CASES.length + ', the one that was not on the list',
+      'included. that is why you have root now: analysts who finish the job get the',
+      'keys. that is the rule here.', '',
+      'things to try while you are root:',
+      '  cat /etc/shadow        go on, look. nothing to crack, every account is locked.',
+      '  cat /etc/sudoers       the line that got you here is in /etc/sudoers.d',
+      '  grep wheel /etc/group  you are in it now',
+      '  rm -rf / --no-preserve-root',
+      '                         still will not work. the write-blocker is hardware.',
+      '  exit                   back to being ' + LX.USER, '',
+      'thanks for playing. if you liked it, run `contact` and say hi.',
+      '                                                              ' + C.owner, ''].join('\n'), { denied: true }) }, { denied: true }),
     proc: D({
       cpuinfo: F('processor\t: 191\nmodel name\t: ' + cpu + '\ncpu cores\t: 96\nsiblings\t: 192\nflags\t\t: fpu sse4_2 avx2 avx512f aes sha_ni forensics write_blocker\nbogomips\t: 10800.00\n# (processors 0 to 190 omitted, they look the same)\n'),
       meminfo: F('MemTotal:       ' + C.machine.mem + '\nMemFree:        enough\nEvidenceCache:  plenty\n'),

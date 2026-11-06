@@ -150,7 +150,40 @@ var LX_CASES = [
       hintsUsed[c.id] = n; LX.store.set('hints', hintsUsed);
       return { n: n, of: c.hints.length, text: c.hints[n - 1] };
     },
-    reset: function () { solved = {}; hintsUsed = {}; LX.store.set('solved', solved); LX.store.set('hints', hintsUsed); LX.ui.updatePrompt(); if (LX.gui) LX.gui.render(); }
+    reset: function () {
+      solved = {}; hintsUsed = {}; LX.store.set('solved', solved); LX.store.set('hints', hintsUsed);
+      // sudo rights came from the closed cases, so they go with them
+      LX.store.set('promoted', false);
+      var sd = LX.fs.get('/etc/sudoers.d');
+      if (sd) delete sd.c[LX.USER];
+      LX.ui.updatePrompt(); if (LX.gui) LX.gui.render();
+    }
+  };
+
+  // the last case closed: the owner logs in and puts you in sudoers. sudo itself (commands.js) only
+  // asks LX.isSudoer(), so this is the ceremony plus the paper trail an investigator would find
+  LX.promote = function (out) {
+    var u = LX.USER, o = LX_CONFIG.owner, H = LX.HOST, t = LX.logTime(), rule = u + ' ALL=(ALL:ALL) NOPASSWD: ALL';
+    var as = ' sudo:     ' + o + ' : TTY=pts/2 ; PWD=/home/' + o + ' ; USER=root ; COMMAND=';
+    LX.store.set('promoted', true);
+    LX.authlog.push(t + ' ' + H + ' sshd[4242]: Accepted publickey for ' + o + ' from 192.0.2.47 port 51515 ssh2: ED25519 SHA256:lx/closed+every+case');
+    LX.authlog.push(t + ' ' + H + as + '/usr/bin/usermod -aG wheel ' + u);
+    LX.authlog.push(t + ' ' + H + " usermod[4250]: add '" + u + "' to group 'wheel'");
+    LX.authlog.push(t + ' ' + H + as + '/usr/bin/tee /etc/sudoers.d/' + u);
+    var sd = LX.fs.get('/etc/sudoers.d');
+    if (sd) sd.c[u] = LX.F(rule + '\n', { denied: true });
+    function ps(cmd) { return span('u', o) + span('at', '@') + span('h', H) + ' ' + span('p', '~') + ' ' + span('c-green', '❯') + ' ' + LX.highlight(cmd); }
+    out.text('');
+    out.html(span('c-dim', o + ' logged in from 192.0.2.47 (ssh), with something for you:'));
+    out.html(ps('sudo usermod -aG wheel ' + u));
+    out.html(ps("echo '" + rule + "' | sudo tee /etc/sudoers.d/" + u));
+    out.text(rule);
+    var st = document.createElement('div');
+    st.className = 'stamp';
+    st.textContent = 'PROMOTED: ANALYST';
+    out.el(st);
+    out.html(span('c-green', 'you are in the sudoers file now. ') + LX.cmdLink('sudo -l', 'sudo -l', 'c-cyan') + span('c-dim', ' shows what that means, ') +
+      LX.cmdLink('sudo -i', 'sudo -i', 'c-cyan') + span('c-dim', ' opens a root shell. there is a note for you in /root.'));
   };
 
   function progressBar(n, t, w) {
@@ -211,6 +244,7 @@ var LX_CASES = [
       ctx.out.html(span('c-amber b glow', 'every case closed. that is a full investigation.'));
       var C = LX_CONFIG, how = C.email ? 'mail me at ' + C.email : C.links.github ? 'find me on ' + C.links.github : 'let me know';
       ctx.out.html(span('c-dim', 'if you enjoyed this, ' + how + '. i would love to hear which one took you the longest.'));
+      if (!LX.store.get('promoted', false)) LX.promote(ctx.out);
     } else if (id === '007') {
       ctx.out.html(span('c-violet', 'you found the one that was not on the list. nice eyes.'));
     }

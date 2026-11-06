@@ -129,6 +129,7 @@
     out.html(span('c-dim', LX.HOST + ' login: ') + esc(name) + (remembered && LX.store.get('user', null) === name ? span('c-dim', '  (remembered. `logout` to switch)') : ''));
     if (name !== LX.USER) { LX.hist.length = 0; LX.histTimes.length = 0; LX.histIdx = 0; }
     LX.USER = name;
+    LX.rootStack = []; LX.sudoDepth = 0; // a new login never starts as root
     LX.HOME = '/home/' + name;
     var last = LX.store.get('lastLogin', null), now = new Date();
     LX.store.set('user', name);
@@ -157,6 +158,8 @@
     out.html(span('c-dim', 'everything underlined on hover is clickable. tab completes. pipes work. the evidence is real.'));
     var n = LX.cases.solvedCount();
     if (n) out.html(span('c-dim', 'welcome back. ') + span('c-green', n + '/' + LX.cases.total() + ' cases closed') + span('c-dim', ' so far.'));
+    // closed everything before promotions existed: you are owed one
+    if (LX.isSudoer() && !LX.store.get('promoted', false)) LX.promote(out);
     out.text('');
     LX.running = null;
     LX.booted = true;

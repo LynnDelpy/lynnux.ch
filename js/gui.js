@@ -48,6 +48,10 @@
         try { id = await LX.cases.check(v); } finally { sb.disabled = false; msg.textContent = ''; }
         if (id) {
           LX.cases.markSolved(id);
+          if (LX.isSudoer() && !LX.store.get('promoted', false)) {
+            LX.promote(LX.term);
+            setTimeout(function () { LX.ui.toast('PROMOTED: you are in sudoers now'); }, 2300);
+          }
           LX.ui.toast('CASE LX-' + id + ' CLOSED');
         } else { msg.className = 'msg c-red'; msg.textContent = 'no match. (checked by hash, locally)'; }
       }

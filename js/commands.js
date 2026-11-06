@@ -51,6 +51,7 @@
     paths.forEach(function (p, pi) {
       var abs = LX.fs.norm(p), n = LX.fs.get(abs);
       if (!n) { ctx.out.err("ls: cannot access '" + p + "': No such file or directory"); return; }
+      if (n.t === 'd' && n.denied && !LX.isRoot()) { ctx.out.err("ls: cannot open directory '" + p + "': Permission denied"); return; }
       var entries;
       if (n.t !== 'd') entries = [[p, n, p]];
       else {
@@ -64,7 +65,8 @@
         if (n.t === 'd') ctx.out.text('total ' + entries.length);
         entries.forEach(function (e) {
           var nd = e[1], ro = nd.ro || !LX.fs.writable(abs);
-          var perm = (nd.t === 'd' ? 'd' : nd.t === 'l' ? 'l' : '-') + (nd.t === 'l' ? 'rwxrwxrwx' : ro ? (nd.t === 'd' ? 'r-xr-xr-x' : 'r--r--r--') : (nd.t === 'd' ? 'rwxr-xr-x' : 'rw-r--r--'));
+          var perm = nd.denied ? (nd.t === 'd' ? 'drwx------' : '-r--------') :
+            (nd.t === 'd' ? 'd' : nd.t === 'l' ? 'l' : '-') + (nd.t === 'l' ? 'rwxrwxrwx' : ro ? (nd.t === 'd' ? 'r-xr-xr-x' : 'r--r--r--') : (nd.t === 'd' ? 'rwxr-xr-x' : 'rw-r--r--'));
           var owner = nd.src || abs.indexOf(LX.HOME + '/cases') === 0 ? LX.pad(LX_CONFIG.owner, 8) + ' evidence' : abs.indexOf('/home') === 0 ? LX.pad(LX.USER, 8) + ' ' + LX.pad(LX.USER, 8) : 'root     root    ';
           var sz = nd.t === 'd' ? 4096 : nd.t === 'l' ? nd.url.length : LX.fs.size(nd);
           var line = perm + ' 1 ' + owner + ' ' + LX.pad(o.f.h ? LX.fmtSize(sz) : sz, 7, true) + ' ' + lsDate(nd.mtime) + ' ';
@@ -82,13 +84,14 @@
     var abs = LX.fs.norm(p), n = LX.fs.get(abs);
     if (!n) return ctx.out.err('cd: no such file or directory: ' + p);
     if (n.t !== 'd') return ctx.out.err('cd: not a directory: ' + p);
+    if (n.denied && !LX.isRoot()) return ctx.out.err('cd: permission denied: ' + p);
     LX.oldpwd = LX.fs.cwd;
     LX.fs.cwd = abs;
   });
   def('pwd', { cat: 'nav', help: 'print working directory' }, function (ctx) { ctx.out.text(LX.fs.cwd); });
   def('tree', { cat: 'nav', help: 'show a directory tree', usage: 'tree [-a] [dir]' }, function (ctx) {
     var o = LX.opts(ctx.args, { flags: 'a' }), p = o.rest[0] || '.', abs = LX.fs.norm(p), n = LX.fs.get(abs);
-    if (!n || n.t !== 'd') return ctx.out.err('tree: ' + p + ' [error opening dir]');
+    if (!n || n.t !== 'd' || n.denied && !LX.isRoot()) return ctx.out.err('tree: ' + p + ' [error opening dir]');
     var nd = 0, nf = 0;
     ctx.out.html(span('c-cyan b', p));
     (function walk(node, prefix, path) {
@@ -113,6 +116,7 @@
     (function walk(n, path, nm) {
       var ok = (!name || name.test(nm)) && (!type || (type === 'd') === (n.t === 'd'));
       if (ok) ctx.out.html(LX.lsName(n, path, path).replace(/[\/@](<\/span>)$/, '$1'));
+      if (n.t === 'd' && n.denied && !LX.isRoot()) return ctx.out.err("find: '" + path + "': Permission denied");
       if (n.t === 'd') Object.keys(n.c).sort().forEach(function (k) { walk(n.c[k], path.replace(/\/$/, '') + '/' + k, k); });
     })(root, start, start.split('/').pop());
   });
@@ -202,6 +206,7 @@
       ctx.out.err('rm: use --no-preserve-root to override this failsafe');
       return 1;
     }
+    if (p.wipe && LX.isRoot()) return LX.nuke(ctx, p, ['rm'].concat(ctx.args));
     if (p.wipe) {
       Object.keys(LX.fs.root.c).sort().forEach(function (k) { ctx.out.err("rm: cannot remove '/" + k + "': Permission denied"); });
       ctx.out.text('(you are a guest. wiping a system takes root. not that root would help.)', 'c-dim');
@@ -468,8 +473,11 @@
   def('fish', { cat: 'system', hidden: true }, function (ctx) {
     ctx.out.html(span('c-dim', 'zsh: command not found: fish ') + span('c-faint', '(the autosuggestions here were stolen from it anyway)'));
   });
-  def('whoami', { cat: 'system', help: 'who are you' }, function (ctx) { ctx.out.text(LX.USER); });
-  def('id', { cat: 'system', help: 'user identity' }, function (ctx) { ctx.out.text('uid=1001(' + LX.USER + ') gid=1001(' + LX.USER + ') groups=1001(' + LX.USER + '),4747(evidence-ro)'); });
+  def('whoami', { cat: 'system', help: 'who are you' }, function (ctx) { ctx.out.text(LX.whoami()); });
+  def('id', { cat: 'system', help: 'user identity' }, function (ctx) {
+    if (LX.isRoot()) return ctx.out.text('uid=0(root) gid=0(root) groups=0(root)');
+    ctx.out.text('uid=1001(' + LX.USER + ') gid=1001(' + LX.USER + ') groups=1001(' + LX.USER + ')' + (LX.isSudoer() ? ',10(wheel)' : '') + ',4747(evidence-ro)');
+  });
   def('hostname', { cat: 'system', help: 'machine name' }, function (ctx) { ctx.out.text(LX.HOST); });
   def('uname', { cat: 'system', help: 'kernel info', usage: 'uname [-a]' }, function (ctx) {
     ctx.out.text(ctx.args[0] === '-a' ? 'Linux ' + LX.HOST + ' ' + LX_CONFIG.machine.kernel + ' #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux' : 'Linux');
@@ -496,6 +504,7 @@
     });
   });
   def('logout', { cat: 'system', help: 'log out, then log back in under another name', usage: 'logout' }, function (ctx) {
+    if (LX.rootStack.length) return LX.cmds.exit.fn(ctx);
     LX.authlog.push(LX.logTime() + ' ' + LX.HOST + ' login[812]: pam_unix(login:session): session closed for user ' + LX.USER);
     LX.store.set('user', null);
     var w = LX.store.get('wtmp', []);
@@ -503,25 +512,100 @@
     ctx.out.text('logout', 'c-dim');
     LX.afterRun = function () { LX.ui.out.textContent = ''; LX.startSession(false); };
   });
-  LX.cmds.exit = LX.cmds.logout; LX.cmds.login = LX.cmds.logout;
-  def('sudo', { cat: 'system', help: 'you know what this does', hidden: true }, function (ctx) {
-    var cmd = ctx.args.join(' '), i = 0;
-    if (cmd === 'make me a sandwich') return ctx.out.text('okay.');
-    while (i < ctx.args.length && ctx.args[i][0] === '-') i++; // sudo -E, sudo -H, ...
-    var what = ctx.args[i], rest = ctx.args.slice(i + 1);
+  LX.cmds.login = LX.cmds.logout;
+  def('exit', { cat: 'system', help: 'leave a root shell, or log out', usage: 'exit' }, function (ctx) {
+    var f = LX.rootStack.pop();
+    if (!f) return LX.cmds.logout.fn(ctx);
+    LX.fs.cwd = LX.fs.get(f.cwd) ? f.cwd : LX.HOME;
+    ctx.out.text('logout', 'c-dim');
+  });
+
+  // sudo is earned on this box: close every case and the owner adds you to sudoers (LX.promote, cases.js).
+  // until then it says no, logs it, and tells you how far along you are
+  LX.sudoLog = function (cmd, ok) {
+    var l = LX.logTime() + ' ' + LX.HOST + ' sudo:  ' + (ok ? '   ' : '') + LX.USER + ' : ' + (ok ? '' : 'user NOT in sudoers ; ') +
+      'TTY=pts/1 ; PWD=' + LX.fs.cwd + ' ; USER=root ; COMMAND=' + cmd;
+    LX.authlog.push(l);
+    return l;
+  };
+  LX.sudoHint = function (ctx) {
+    var n = LX.cases.solvedCount(), t = LX.cases.total();
+    ctx.out.html(span('c-dim', '(sudo is earned on this box: close all ' + t + ' ') + LX.cmdLink('cases', 'cases', 'c-amber') +
+      span('c-dim', ' and ' + LX_CONFIG.owner + ' adds you to sudoers. you are at ' + n + '/' + t + '.)'));
+  };
+  // a root shell. HOME stays yours on purpose: the write-blocker keys off it, and root does not get past it
+  LX.enterRoot = function (login, log) {
+    LX.rootStack.push({ cwd: LX.fs.cwd, log: log });
+    if (login) LX.fs.cwd = '/root';
+  };
+  function lecture(ctx) {
+    if (LX.store.get('lectured', false)) return;
+    LX.store.set('lectured', true);
+    ['', 'We trust you have received the usual lecture from the local System', 'Administrator. It usually boils down to these three things:', '',
+      '    #1) Respect the privacy of others.', '    #2) Think before you type.', '    #3) With great power comes great responsibility.', '']
+      .forEach(function (l) { ctx.out.text(l); });
+  }
+  def('sudo', { cat: 'system', help: 'run a command as root, once you have earned it', usage: 'sudo command | sudo -l | sudo -i', hidden: true }, async function (ctx) {
+    var a = ctx.args.slice(), flags = [];
+    if (a.join(' ') === 'make me a sandwich') return ctx.out.text('okay.');
+    while (a.length && a[0][0] === '-' && a[0] !== '-') { var f = a.shift(); flags.push(f); if (f === '-u' || f === '-g') a.shift(); }
+    var what = a[0], rest = a.slice(1), granted = LX.isSudoer() || LX.isRoot();
+    if (flags.indexOf('-l') >= 0) {
+      if (!granted) { ctx.out.text('Sorry, user ' + LX.USER + ' may not run sudo on ' + LX.HOST + '.'); LX.sudoHint(ctx); return 1; }
+      lecture(ctx); // the first thing the promotion tells you to run, so the lecture lands here
+      ['Matching Defaults entries for ' + LX.USER + ' on ' + LX.HOST + ':', '    env_reset, secure_path=/usr/local/sbin\\:/usr/local/bin\\:/usr/bin, lecture=once', '',
+        'User ' + LX.USER + ' may run the following commands on ' + LX.HOST + ':', '    (ALL : ALL) NOPASSWD: ALL'].forEach(function (l) { ctx.out.text(l); });
+      return;
+    }
     // sudo rm -rf / --no-preserve-root, sudo rm -rf /*: the show, in extra.js
     if (what === 'rm') {
       var p;
       try { p = LX.rmPlan(rest); } catch (e) { return ctx.out.err('rm: ' + e.message); }
       if (p.bad) return LX.rmBadOption(ctx, p.bad);
-      if (p.wipe || p.failsafe) return LX.nuke(ctx, p, ['rm'].concat(rest));
+      if (p.wipe || p.failsafe) { if (granted) lecture(ctx); return LX.nuke(ctx, p, ['rm'].concat(rest)); }
     }
-    // the disk wipers tell their own joke, sudo or not
-    if (LX.diskCmd && LX.diskCmd(what)) return LX.cmds[what].fn(Object.assign({}, ctx, { name: what, args: rest, argv: ctx.args.slice(i) }));
-    LX.authlog.push(LX.logTime() + ' ' + LX.HOST + ' sudo:  ' + LX.USER + ' : user NOT in sudoers ; TTY=pts/1 ; PWD=' + LX.fs.cwd + ' ; USER=root ; COMMAND=' + (cmd || '/bin/sh'));
-    ctx.out.html(span('c-red', LX.USER + ' is not in the sudoers file. this incident will be reported.'));
-    ctx.out.html(span('c-dim', '(it actually was. see ') + LX.cmdLink('tail -n 3 /var/log/auth.log', '/var/log/auth.log', 'c-amber') + span('c-dim', ')'));
+    if (!granted) {
+      // the disk wipers tell their own joke, sudo or not
+      if (LX.diskCmd && LX.diskCmd(what)) return LX.cmds[what].fn(Object.assign({}, ctx, { name: what, args: rest, argv: a }));
+      LX.sudoLog(ctx.args.join(' ') || '/bin/sh', false);
+      ctx.out.html(span('c-red', LX.USER + ' is not in the sudoers file. this incident will be reported.'));
+      ctx.out.html(span('c-dim', '(it actually was. see ') + LX.cmdLink('tail -n 3 /var/log/auth.log', '/var/log/auth.log', 'c-amber') + span('c-dim', ')'));
+      LX.sudoHint(ctx);
+      return 1;
+    }
+    lecture(ctx);
+    // sudo !!: the classic. zsh would expand it first, so run the expanded line once this one is done
+    if (what === '!!') {
+      var prev = LX.hist[LX.hist.length - ((LX.lastLine || '')[0] === ' ' ? 1 : 2)];
+      if (!prev || prev.indexOf('!!') >= 0) return ctx.out.err('zsh: no such event: !!');
+      LX.afterRun = function () { LX.run('sudo ' + prev); };
+      return;
+    }
+    // a root shell: sudo -i, sudo -s, sudo su [-], sudo zsh
+    var loginFlag = flags.indexOf('-i') >= 0, shellFlag = flags.indexOf('-s') >= 0;
+    var suRoot = what === 'su' && rest.every(function (x) { return x === '-' || x === '-l' || x === 'root'; });
+    if ((!what && (loginFlag || shellFlag)) || suRoot || (['zsh', 'bash', 'sh'].indexOf(what) >= 0 && !rest.length)) {
+      var login = loginFlag || (suRoot && (rest.indexOf('-') >= 0 || rest.indexOf('-l') >= 0));
+      LX.enterRoot(login, LX.sudoLog(what ? '/usr/bin/' + a.join(' ') : '/usr/bin/zsh', true));
+      return;
+    }
+    if (!what) { ctx.out.text('usage: sudo command | sudo -l | sudo -i | sudo -s'); return 1; }
+    var c = LX.cmds[what];
+    LX.sudoLog('/usr/bin/' + a.join(' '), true);
+    if (!c) return ctx.out.err('sudo: ' + what + ': command not found');
+    LX.sudoDepth++;
+    try { return await c.fn(Object.assign({}, ctx, { name: what, args: rest, argv: a })); } finally { LX.sudoDepth--; }
   });
-  LX.cmds.su = LX.cmds.sudo; LX.cmds.doas = LX.cmds.sudo;
+  LX.cmds.doas = LX.cmds.sudo;
+  def('su', { cat: 'system', help: 'become root (root has no password here)', usage: 'su [-]', hidden: true }, function (ctx) {
+    var who = ctx.args.filter(function (x) { return x[0] !== '-'; })[0] || 'root', login = ctx.args.indexOf('-') >= 0 || ctx.args.indexOf('-l') >= 0;
+    if (who !== 'root') { ctx.out.err('su: only root is set up for su on this box'); return 1; }
+    if (LX.isRoot()) return LX.enterRoot(login, null); // root needs no password to become root
+    ctx.out.text('Password: ');
+    ctx.out.err('su: Authentication failure');
+    LX.authlog.push(LX.logTime() + ' ' + LX.HOST + ' su[2323]: FAILED SU (to root) ' + LX.USER + ' on pts/1');
+    ctx.out.text('(root has no password here, every account is locked. ' + (LX.isSudoer() ? 'you are a sudoer though: sudo -i)' : 'the way in is sudo, and sudo is earned: see `cases`.)'), 'c-dim');
+    return 1;
+  });
   def('chmod', { cat: 'system', hidden: true }, function (ctx) { ctx.out.err('chmod: changing permissions of evidence is how you lose a court case.'); });
 })();

@@ -55,7 +55,7 @@ button{font-family:inherit}
 .ul{text-decoration:underline;text-underline-offset:3px}
 .prompt-line.busy{visibility:hidden}
 
-.u{color:var(--amber)} .at{color:var(--dim)} .h{color:var(--amber)} .p{color:var(--cyan)}
+.u{color:var(--amber)} .u.root{color:var(--red)} .at{color:var(--dim)} .h{color:var(--amber)} .p{color:var(--cyan)}
 .c-amber{color:var(--amber)} .c-cyan{color:var(--cyan)} .c-red{color:var(--red)} .c-green{color:var(--green)}
 .c-blue{color:var(--blue)} .c-violet{color:var(--violet)} .c-dim{color:var(--dim)} .c-faint{color:var(--faint)}
 .c-fg{color:var(--fg)} .c-arch{color:var(--arch)} .b{font-weight:700} .i{font-style:italic}

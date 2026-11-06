@@ -24,6 +24,9 @@ inspired by [lumiingenii.ch](https://lumiingenii.ch), go play their snake.
   whatis / tldr, concept pages (`man 7 forensics`, `man hier`, `man lynnux`) and
   FORENSICS NOTES on the forensics tools. pages live in `js/man.js`.
 - **easter eggs.** not telling. `man hier` is a decent place to start digging.
+- **root, earned.** close all 7 cases and the owner promotes you into sudoers:
+  `sudo -l`, a root shell (`sudo -i`), and a note in `/root`. until then `sudo`
+  says no and logs it. even root can't get past the write-blocker.
 - **7 cases**: metadata, bit-plane stego, file carving, dns exfil, deleted file
   recovery on FAT12, audio spectrogram, plus one that isn't on the list.
 - **a write-blocker**: `~/cases` is read-only. tools that produce files drop them

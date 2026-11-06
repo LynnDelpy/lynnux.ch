@@ -615,7 +615,7 @@
     });
   });
   def('tty', { cat: 'system', help: 'which terminal am i on' }, function (ctx) { ctx.out.text('/dev/tty1'); });
-  def('groups', { cat: 'system', help: 'your groups' }, function (ctx) { ctx.out.text(LX.USER + ' evidence-ro'); });
+  def('groups', { cat: 'system', help: 'your groups' }, function (ctx) { ctx.out.text(LX.isRoot() ? 'root' : LX.USER + (LX.isSudoer() ? ' wheel' : '') + ' evidence-ro'); });
   def('locale', { cat: 'system', help: 'language settings' }, function (ctx) {
     ctx.out.text('LANG=en_US.UTF-8\nLC_TIME=de_CH.UTF-8\nLC_NUMERIC=de_CH.UTF-8\nLC_MONETARY=de_CH.UTF-8\nLC_PAPER=de_CH.UTF-8\nLC_ALL=');
   });
@@ -746,16 +746,21 @@
   // and then the twist: nothing was deleted, and the attempt is evidence now.
   // ctrl+c skips straight to the twist (no LX.keys handler, so it gets through)
   LX.nuke = async function (ctx, p, argv) {
-    var term = LX.term, who = LX.USER, n = 0, panel = null, skipped = false;
-    term.html(span('c-dim', ctx.name === 'doas' ? 'doas (' + who + '@' + LX.HOST + ') password: ' : '[sudo] password for ' + who + ': ') + '••••••••' + span('c-faint', '  (autofilled. it was hunter2.)'));
-    await ctx.sleep(500);
-    term.text(who + ' is not in the sudoers file.', 'c-red');
-    term.text('...but ' + (p.failsafe ? 'rm -rf /' : p.allTop ? 'rm -rf /*' : 'rm -rf / --no-preserve-root') + ' is a special occasion. go ahead, just this once.', 'c-dim');
-    // the log does not do exceptions: it says what really happened
-    var log = LX.logTime() + ' ' + LX.HOST + ' sudo:  ' + who + ' : user NOT in sudoers ; TTY=pts/1 ; PWD=' + LX.fs.cwd + ' ; USER=root ; COMMAND=/usr/bin/' + argv.join(' ');
-    LX.authlog.push(log);
+    var term = LX.term, who = LX.USER, n = 0, panel = null, skipped = false, log = null;
+    // three ways in: a root shell (sudo -i earlier), a real sudoer, or a guest who gets an exception
+    var shell = LX.rootStack.length > 0, granted = shell || LX.isSudoer();
+    if (shell) log = LX.rootStack[LX.rootStack.length - 1].log; // where you became root is the trail
+    else if (granted) log = LX.sudoLog('/usr/bin/' + argv.join(' '), true);
+    else {
+      term.html(span('c-dim', ctx.name === 'doas' ? 'doas (' + who + '@' + LX.HOST + ') password: ' : '[sudo] password for ' + who + ': ') + '••••••••' + span('c-faint', '  (autofilled. it was hunter2.)'));
+      await ctx.sleep(500);
+      term.text(who + ' is not in the sudoers file.', 'c-red');
+      term.text('...but ' + (p.failsafe ? 'rm -rf /' : p.allTop ? 'rm -rf /*' : 'rm -rf / --no-preserve-root') + ' is a special occasion. go ahead, just this once.', 'c-dim');
+      // the log does not do exceptions: it says what really happened
+      log = LX.sudoLog('/usr/bin/' + argv.join(' '), false);
+    }
     if (p.failsafe) {
-      await ctx.sleep(400);
+      if (!granted) await ctx.sleep(400);
       term.err("rm: it is dangerous to operate recursively on '/'");
       term.err('rm: use --no-preserve-root to override this failsafe');
       term.text('(even root gets that one. there is a flag for it, if you are sure.)', 'c-faint');
@@ -770,7 +775,7 @@
       Object.keys(node.c || {}).sort().forEach(function (k) {
         var abs = path + '/' + k, ch = node.c[k], ok = ch.t === 'd' ? walk(ch, abs) : true, why = null;
         if (abs === '/dev/sdb') why = "that is the suspect's usb stick. it is evidence.";
-        else if (abs.indexOf(LX.HOME + '/cases') === 0) why = 'write-blocker says no';
+        else if (abs.indexOf('/home/' + who + '/cases') === 0) why = 'write-blocker says no';
         else if (abs.indexOf('/proc') === 0) why = 'Operation not permitted';
         else if (abs === '/var/log/auth.log') why = 'logs are the first thing an attacker deletes. and the first thing we back up.';
         else if (!ok) why = 'Directory not empty';
@@ -812,10 +817,11 @@
     term.text('');
     term.html(span('c-amber b', 'just kidding.') + span('c-dim', ' nothing was deleted. this is a forensic workstation.'));
     term.html('  ' + span('c-green', 'write-blocker') + span('c-dim', '   0 bytes modified. the evidence was never mounted read-write.'));
+    if (granted) term.html('  ' + span('c-red', 'root or not  ') + span('c-dim', '   uid 0 does not reach a hardware write-blocker.'));
     term.html('  ' + span('c-cyan', 'and even if  ') + span('c-dim', '   rm only marks space as free. deleted is not gone. ') + LX.cmdLink('cd ~/cases/case-005 && cat BRIEFING.txt', 'case-005', 'c-amber') + span('c-dim', ' shows how.'));
     term.text('');
     term.text('your attempt is evidence now:');
-    term.html('  ' + LX.cmdLink('tail -n 2 /var/log/auth.log', '/var/log/auth.log', 'c-amber') + '  ' + span('c-dim', log));
+    if (log) term.html('  ' + LX.cmdLink('tail -n 2 /var/log/auth.log', '/var/log/auth.log', 'c-amber') + '  ' + span('c-dim', log) + (shell ? span('c-faint', '  (where you became root. everything after counts as you.)') : ''));
     if (sneaky) term.html('  ' + span('c-amber', '~/.zsh_history') + '     ' + span('c-dim', 'nothing. you started the line with a space (HIST_IGNORE_SPACE). sneaky. auth.log got you anyway.'));
     else term.html('  ' + LX.cmdLink('tail -n 2 ~/.zsh_history', '~/.zsh_history', 'c-amber') + '     ' + span('c-dim', ': ' + Math.floor(LX.histTimes[last] / 1000) + ':0;' + LX.hist[last]));
     term.html(span('c-dim', 'the analyst who builds your timeline says thanks.') + (n > 1 ? span('c-faint', '  (attempt #' + n + '. the write-blocker does not get tired.)') : ''));
