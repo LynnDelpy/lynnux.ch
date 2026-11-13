@@ -34,7 +34,7 @@ HOST_RE = re.compile(r'^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z
 USER_RE = re.compile(r'^[a-z_][a-z0-9_-]{0,23}$')
 # what gets deployed. an allowlist on purpose: nothing else in the repo is secret,
 # but build tools, site.env and whatever gets added later have no business being served
-PUBLIC = ['index.html', '404.html', 'favicon.svg', '_headers', 'CNAME', 'css', 'js', 'assets', 'evidence']
+PUBLIC = ['index.html', '404.html', 'favicon.svg', '_headers', 'CNAME', 'robots.txt', 'css', 'js', 'assets', 'evidence', 'internal']
 
 
 def fail(msg):

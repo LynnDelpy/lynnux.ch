@@ -24,11 +24,14 @@ inspired by [lumiingenii.ch](https://lumiingenii.ch), go play their snake.
   whatis / tldr, concept pages (`man 7 forensics`, `man hier`, `man lynnux`) and
   FORENSICS NOTES on the forensics tools. pages live in `js/man.js`.
 - **easter eggs.** not telling. `man hier` is a decent place to start digging.
-- **root, earned.** close all 7 cases and the owner promotes you into sudoers:
+- **root, earned.** close every case and the owner promotes you into sudoers:
   `sudo -l`, a root shell (`sudo -i`), and a note in `/root`. until then `sudo`
   says no and logs it. even root can't get past the write-blocker.
-- **7 cases**: metadata, bit-plane stego, file carving, dns exfil, deleted file
-  recovery on FAT12, audio spectrogram, plus one that isn't on the list.
+- **11 cases**, each with a briefing and two hints:
+  - forensics: metadata, bit-plane stego, file carving, dns exfil, deleted file
+    recovery on FAT12, audio spectrogram, plus one that isn't on the list
+  - beyond forensics: a known-plaintext xor (crypto), a license check to undo
+    (rev), a robots.txt that says too much (web) and an encoding onion (misc)
 - **a write-blocker**: `~/cases` is read-only. tools that produce files drop them
   into `~/work`, like you would in a real investigation.
 - **a plain view** ("not a terminal person?") with links, downloads and flag
@@ -138,13 +141,22 @@ out, so a rebuild only shows up in git when something really changed.
 
 ## adding a case
 
-1. add a `case_008(flag)` function to `tools/build_evidence.py` that writes
-   into `evidence/case-008/`, add the flag body to `FLAG_BODIES` (the prefix
-   comes from `site.env`), call it in `main()`.
+1. add a `case_012(flag)` function to `tools/build_evidence.py` that writes
+   into `evidence/case-012/`, add the flag body to `FLAG_BODIES` (the prefix
+   comes from `site.env`), call it in `main()`. end it with an
+   `assert flag not in ...`: the repo is public, a plaintext flag in a file is
+   a free flag.
 2. run the builder.
-3. add an entry to `LX_CASES` in `js/cases.js` (title, briefing, hints).
+3. add an entry to `LX_CASES` in `js/cases.js` (title, briefing, hints, and a
+   `cat`: crypto, rev, web and misc land under "beyond forensics" in the plain
+   view, everything else under forensics).
+4. a case that serves files from outside `evidence/` (like the web one with
+   `robots.txt` and `internal/`) also needs them in `PUBLIC` in
+   `tools/build.py`, or they never get deployed.
 
 that's it, the folder, briefing, downloads and plain view all build themselves.
+closing every case is what gets a visitor into sudoers, so a new case raises
+that bar too.
 
 ## deploying
 
@@ -235,6 +247,7 @@ js/gui.js             the plain view panel
 js/boot.js            boot sequence
 js/evidence.gen.js    generated: flag hashes + evidence file hashes
 evidence/             generated challenge files
+robots.txt, internal/  generated: the web case, served from the site itself
 tools/build.py        site.env -> config.js, html, deploy/, and dist/ with --dist
 tools/siteenv.py      the site.env parser (shared by both builders)
 tools/build_evidence.py

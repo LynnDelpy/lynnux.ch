@@ -77,6 +77,53 @@ var LX_CASES = [
     ]
   },
   {
+    id: '008', title: 'xor marks the spot', diff: 'easy', cat: 'crypto', tools: 'head, xor, xxd',
+    brief: [
+      'intercepted on the suspect\'s "secure" channel. they bragged it is',
+      'military grade xor with a secret key, so nobody can read it.',
+      'one detail from earlier intercepts: every message starts with a flag.'
+    ],
+    hints: [
+      'xor undoes itself. if cipher = plain ^ key, then plain ^ cipher = key. which plain bytes do you already know?',
+      'every flag starts with ' + LX_CONFIG.flagPrefix + '{. try: head -c ' + (LX_CONFIG.flagPrefix.length + 1) + ' intercept.bin | xor -s \'' + LX_CONFIG.flagPrefix + '{\'. the key repeats.'
+    ]
+  },
+  {
+    id: '009', title: 'license to check', diff: 'easy', cat: 'rev', tools: 'cat, base64, rev, xor',
+    brief: [
+      'the suspect\'s exfil tool only runs with a valid license key.',
+      'we recovered the script that checks it. they called it uncrackable.',
+      'there is no python on this box, and you will not need it.'
+    ],
+    hints: [
+      'the script never decrypts anything. it mangles your input and compares it with SECRET. so undo the mangling on SECRET, last step first.',
+      'base64 -d, then rev, then xor with KEY. count the characters in "suspect_47" to get KEY. careful: xor reads keys as hex, so convert first (calc can).'
+    ]
+  },
+  {
+    id: '010', title: 'do not crawl', diff: 'easy', cat: 'web', tools: 'curl, unzip, base64',
+    brief: [
+      'the drop server we took down was this very web server. the crew',
+      'cleaned it up, mostly. web servers tell search engines where not',
+      'to look. people forget that everyone else can read that list too.'
+    ],
+    hints: [
+      'every site has a file for crawlers at its root: curl /robots.txt (or open it in your browser).',
+      'download what it hides (curl -O ...), then unzip -l it. dotfiles hide from ls without -a.'
+    ]
+  },
+  {
+    id: '011', title: 'onion', diff: 'medium', cat: 'misc', tools: 'morse, base32, rev, unhex, base64, rot13',
+    brief: [
+      'a ham radio intercept. the operator kept saying "layers".',
+      'peel it one encoding at a time. every layer has a tell.'
+    ],
+    hints: [
+      'start with the dots and dashes: morse -d onion.txt. then look at the alphabet you got back.',
+      'A-Z, 2-7 and = is base32. only 0-9a-f is hex, but backwards. A-Za-z0-9+/= is base64. and the last one is a 13 step rotation.'
+    ]
+  },
+  {
     id: '007', title: '[REDACTED]', diff: '???', cat: '???', tools: '???', secret: true,
     brief: [
       'something on this workstation is hiding in plain sight.',
@@ -117,7 +164,7 @@ var LX_CASES = [
         L.push(' evidence       : ' + f.name + '  (' + f.size + ' bytes)');
         L.push(' sha256         : ' + f.sha256);
       });
-      if (!files.length) L.push(' evidence       : none on file');
+      if (!files.length) L.push(c.cat === 'web' ? ' evidence       : the web server itself, ' + LX.HOST : ' evidence       : none on file');
       L.push('');
       c.brief.forEach(function (b) { L.push(' ' + b); });
       L.push('');
@@ -198,9 +245,16 @@ var LX_CASES = [
     LX_CASES.forEach(function (c) {
       var done = solved[c.id], mark = done ? span('c-green', ' ✓ ') : c.secret ? span('c-violet', ' ? ') : span('c-dim', ' · ');
       var title = c.secret && !done ? '[REDACTED]' : c.title;
-      var row = LX.pad('case-' + c.id, 10) + '  ' + LX.pad(title, 22) + LX.pad(c.diff, 9) + c.cat;
       var hu = hintsUsed[c.id] ? span('c-faint', '  (' + hintsUsed[c.id] + ' hint' + (hintsUsed[c.id] > 1 ? 's' : '') + ')') : '';
-      ctx.out.html(mark + LX.cmdLink('cd ~/cases/case-' + c.id + ' && cat BRIEFING.txt && ls -l', row, done ? 'c-green' : c.secret ? 'c-violet' : 'c-fg') + hu);
+      var open = 'cd ~/cases/case-' + c.id + ' && cat BRIEFING.txt && ls -l', cls = done ? 'c-green' : c.secret ? 'c-violet' : 'c-fg';
+      // on a phone the columns do not fit: title on one line, difficulty + category under it
+      if (LX.narrow() && !ctx.piped) {
+        ctx.out.html(mark + LX.cmdLink(open, 'case-' + c.id + '  ' + title, cls) + hu);
+        ctx.out.html(span('c-dim', '     ' + c.diff + ' · ' + c.cat));
+        return;
+      }
+      var row = LX.pad('case-' + c.id, 10) + '  ' + LX.pad(title, 22) + LX.pad(c.diff, 9) + c.cat;
+      ctx.out.html(mark + LX.cmdLink(open, row, cls) + hu);
     });
     ctx.out.text('');
     ctx.out.html(' ' + progressBar(n, t, 28) + span('c-dim', '  ' + Math.round(n / t * 100) + '%'));

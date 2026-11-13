@@ -103,31 +103,63 @@ audio{display:block;margin:6px 0;max-width:100%;filter:invert(.9) hue-rotate(180
 .st-ev{color:var(--amber);border-left:1px solid var(--line)}
 .st-clock{background:var(--line);color:var(--fg)}
 
+/* the welcome menu: commands in one column, descriptions wrap in the other */
+.menu{display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:3ch;row-gap:1px;margin-left:2ch}
+.menu .mi{white-space:nowrap}
+
 /* ---------- plain view panel ---------- */
-#gui-toggle{position:fixed;right:14px;bottom:calc(var(--status-h) + 12px);z-index:60;background:var(--panel);color:var(--dim);
-  border:1px solid var(--line);padding:5px 11px;font-size:12.5px;cursor:pointer;transition:color .2s,border-color .2s,opacity .6s}
-#gui-toggle:hover,#gui-toggle[aria-expanded="true"]{color:var(--amber);border-color:var(--amber)}
-#gui-toggle.quiet{opacity:.35}
-#gui{position:fixed;right:14px;bottom:calc(var(--status-h) + 50px);z-index:60;width:min(380px,calc(100vw - 28px));
-  max-height:calc(100vh - var(--tape-h) - var(--status-h) - 80px);overflow-y:auto;background:var(--panel);border:1px solid var(--line);
-  border-top:3px solid var(--amber);padding:14px 16px 16px;font-size:13.5px;box-shadow:0 12px 40px rgba(0,0,0,.6)}
-#gui h2{font-size:12px;color:var(--dim);font-weight:400;letter-spacing:.14em;text-transform:uppercase;margin:14px 0 6px}
-#gui h2:first-child{margin-top:0}
-#gui .who{color:var(--amber);font-weight:700;font-size:16px}
-#gui .tag{color:var(--dim)}
-#gui ul{list-style:none}
-#gui li{padding:2px 0}
-#gui .case{border:1px solid var(--line);padding:8px 10px;margin:6px 0;background:var(--bg)}
-#gui .case .t{display:flex;justify-content:space-between;gap:8px}
-#gui .case .t b{color:var(--fg)}
-#gui .case .solved{color:var(--green)}
-#gui .case p{color:var(--dim);margin:4px 0 6px;font-size:12.5px}
-#gui .case .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-#gui input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--fg);font:inherit;font-size:12.5px;padding:4px 6px}
+#gui-toggle{position:fixed;right:14px;bottom:calc(var(--status-h) + 12px);z-index:60;background:var(--panel);color:var(--amber);
+  border:1px solid rgba(255,176,0,.45);padding:7px 13px;font-size:13px;cursor:pointer;transition:color .2s,border-color .2s,opacity .6s}
+#gui-toggle:hover,#gui-toggle:focus-visible{border-color:var(--amber);background:#1a1710}
+#gui-toggle.quiet{opacity:.6}
+#gui{position:fixed;top:var(--tape-h);bottom:var(--status-h);right:0;z-index:60;width:min(600px,100vw);overflow-y:auto;overscroll-behavior:contain;
+  background:var(--panel);border-left:1px solid var(--line);font-size:14px;box-shadow:-18px 0 50px rgba(0,0,0,.55)}
+#gui .head{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
+  padding:14px 20px 12px;background:var(--panel);border-bottom:1px solid var(--line);border-top:3px solid var(--amber)}
+#gui .who{color:var(--amber);font-weight:700;font-size:17px}
+#gui .tag{color:var(--dim);font-size:13px}
+#gui .close{background:none;border:1px solid var(--line);color:var(--fg);font:inherit;font-size:13px;padding:5px 10px;cursor:pointer;flex:none}
+#gui .close:hover,#gui .close:focus-visible{border-color:var(--amber);color:var(--amber)}
+#gui .body{padding:6px 20px 24px}
+#gui .about{color:var(--fg);margin:10px 0;line-height:1.55}
+#gui h2{font-size:12px;color:var(--dim);font-weight:400;letter-spacing:.14em;text-transform:uppercase;margin:22px 0 8px}
+#gui .progress{margin:16px 0 6px}
+#gui .progress .label{color:var(--fg);font-size:13px;margin-bottom:6px}
+#gui .progress .bar{height:8px;background:var(--bg);border:1px solid var(--line)}
+#gui .progress .fill{height:100%;background:var(--amber);transition:width .5s}
+#gui .case{border:1px solid var(--line);padding:12px 14px;margin:10px 0;background:var(--bg)}
+#gui .case.is-solved{border-color:rgba(158,206,106,.35)}
+#gui .case.is-solved p{opacity:.65}
+#gui .case .t{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+#gui .case .t .id{color:var(--dim);font-size:12.5px}
+#gui .case .t b{color:var(--fg);font-size:15px}
+#gui .case .t .done{margin-left:auto;color:var(--green);font-size:13px}
+#gui .badges{display:flex;gap:6px;margin:7px 0 2px}
+#gui .badge{font-size:11.5px;padding:1px 7px;border:1px solid var(--line);color:var(--dim)}
+#gui .b-easy{color:var(--green);border-color:rgba(158,206,106,.4)}
+#gui .b-medium{color:var(--amber);border-color:rgba(255,176,0,.4)}
+#gui .b-hard{color:var(--red);border-color:rgba(255,95,86,.4)}
+#gui .b-secret{color:var(--violet);border-color:rgba(187,154,247,.4)}
+#gui .case p{color:var(--dim);margin:8px 0 10px;font-size:13px;line-height:1.55}
+#gui .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#gui .row.submit{margin-top:8px;flex-wrap:nowrap}
+#gui .links{margin:4px 0 2px}
+#gui input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--fg);font:inherit;font-size:14px;padding:7px 9px}
 #gui input:focus{border-color:var(--amber);outline:0}
-#gui .btn{background:none;border:1px solid var(--line);color:var(--cyan);font-size:12.5px;padding:3px 8px;cursor:pointer;border-bottom:1px solid var(--line)}
-#gui .btn:hover{border-color:var(--amber);color:var(--amber)}
-#gui .msg{font-size:12px;min-height:1.2em}
+#gui .btn{display:inline-block;background:none;border:1px solid var(--line);color:var(--cyan);font:inherit;font-size:13px;padding:6px 10px;cursor:pointer;text-decoration:none}
+#gui .btn:hover,#gui .btn:focus-visible{border-color:var(--amber);color:var(--amber)}
+#gui .btn.go{color:var(--bg);background:var(--amber);border-color:var(--amber);font-weight:700}
+#gui .btn.go:hover{background:var(--amber-2);color:var(--bg)}
+#gui .btn:disabled{opacity:.5;cursor:wait}
+#gui .msg{font-size:13px;min-height:1.3em;margin-top:6px}
+#gui .foot{margin-top:26px;padding-top:14px;border-top:1px solid var(--line)}
+#gui .foot p{margin-bottom:10px}
+@media (max-width:640px){
+  #gui{border-left:0}
+  #gui .head{padding:12px 16px 10px}
+  #gui .body{padding:4px 16px 24px}
+  #gui-toggle{right:10px;bottom:calc(var(--status-h) + 10px)}
+}
 
 /* ---------- overlay (stegsolve, spectrogram, ...) ---------- */
 #overlay{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column}

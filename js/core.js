@@ -22,6 +22,9 @@ LX.esc = function (s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 };
 LX.span = function (cls, text) { return '<span class="' + cls + '">' + LX.esc(text) + '</span>'; };
+// layout hints for output that is printed once and never reflows
+LX.narrow = function () { return window.innerWidth < 640; };
+LX.touch = function () { return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches); };
 LX.cmdLink = function (cmd, label, cls) {
   return '<span tabindex="0" role="button" class="' + (cls || 'c-cyan') + '" data-cmd="' + LX.esc(cmd) + '">' + LX.esc(label) + '</span>';
 };

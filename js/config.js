@@ -7,7 +7,7 @@ var LX_CONFIG = {
     "lynnux.ch",
     "lynnux.li"
   ],
-  "description": "a forensic workstation in your browser. portfolio, links, and real forensics challenges you can solve right here.",
+  "description": "a forensic workstation in your browser. portfolio, links, and ctf challenges (forensics, crypto, rev, web, misc) you can solve right here.",
   "tagline": "digital forensics \u00b7 ctf \u00b7 linux",
   "location": "switzerland",
   "owner": "lucia",

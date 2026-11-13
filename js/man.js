@@ -10,7 +10,7 @@
   var M = LX.MAN = {
     // ---- section 7: concepts
     intro: { s: 7, d: 'what this machine is and how to use it',
-      desc: LX_CONFIG.domain + ' is a forensic workstation that runs in your browser. it is a portfolio, a playground and a set of real forensics challenges at the same time.\n\n' +
+      desc: LX_CONFIG.domain + ' is a forensic workstation that runs in your browser. it is a portfolio, a playground and a set of real ctf challenges at the same time: mostly forensics, plus crypto, rev, web and misc.\n\n' +
         'everything lives in a virtual file system. ~/cases holds the evidence: real files, generated for these challenges. the tools (`exiftool`, `binwalk`, `tcpdump`, `fls`, ...) work on the actual bytes, so what you learn here works on a real machine too.\n\n' +
         'the evidence is write-blocked: ~/cases is read-only, and tools that produce files write them to ~/work instead. that is how real investigations work: never touch the original.\n\n' +
         'flags look like `' + LX_CONFIG.flagPrefix + '{...}`. `submit` checks them by hash, so the flags are not in the source code. they only exist inside the evidence.',
@@ -81,8 +81,8 @@
       opts: [['-i', 'ignore case'], ['-v', 'invert: lines that do not match'], ['-n', 'line numbers'], ['-o', 'print only the matching part'], ['-c', 'count matching lines'], ['-r', 'recurse into directories'], ['-a', 'treat binary as text'], ['-F', 'fixed string, no regex'], ['-e pat', 'add a pattern (repeatable)'], ['-m N', 'stop after N matches'], ['-A N / -B N / -C N', 'N lines of context after / before / around each match']],
       ex: [['grep -i telemetry capture.txt', 'case-insensitive search'], ["tcpdump -r capture.pcap | grep -o '[0-9a-f]{16,}'", 'pull long hex runs out of packet summaries'], ['grep -r flag ~', 'search everything (it will not be that easy)']],
       see: ['strings', 'sed', 'awk'] },
-    head: { d: 'first lines of input', syn: 'head [-n N] [file]', see: ['tail'] },
-    tail: { d: 'last lines of input', syn: 'tail [-n N] [file]', ex: [['tail -n 3 /var/log/auth.log', 'latest auth events']], see: ['head'] },
+    head: { d: 'first lines of input', syn: ['head [-n N] [file]', 'head -c N [file]'], desc: '-c counts bytes instead of lines, and works on binary files too.', ex: [['head -c 16 ~/cases/case-008/intercept.bin | xxd', 'the first 16 bytes']], see: ['tail', 'xxd'] },
+    tail: { d: 'last lines of input', syn: ['tail [-n N] [file]', 'tail -c N [file]'], ex: [['tail -n 3 /var/log/auth.log', 'latest auth events']], see: ['head'] },
     wc: { d: 'count lines, words and bytes', syn: 'wc [-lwcm] [file]', notes: '`wc -c` counts bytes, `wc -m` characters. when they disagree on a text file, it contains multibyte characters. sometimes invisible ones.', see: ['cat', 'xxd'] },
     sort: { d: 'sort lines', syn: 'sort [-rnuf] [file]', opts: [['-n', 'numeric'], ['-r', 'reverse'], ['-u', 'unique'], ['-f', 'ignore case']], see: ['uniq'] },
     uniq: { d: 'collapse repeated lines', syn: 'uniq [-cd] [file]', opts: [['-c', 'prefix lines with counts'], ['-d', 'only print duplicates']], ex: [['cut -d" " -f3 log | sort | uniq -c | sort -rn', 'top talkers']], see: ['sort'] },
@@ -107,6 +107,7 @@
     unhex: { d: 'hex string to bytes (xxd -r -p)', syn: 'unhex [hex | file]', desc: 'ignores whitespace and anything that is not hex, so you can pipe messy output straight in.', ex: [['echo 6c796e6e7578 | unhex', 'decode hex']], see: ['xxd', 'unbin'] },
     unbin: { d: 'binary string (01000001...) to bytes', syn: 'unbin [bits | file]', desc: 'ignores everything that is not 0 or 1.', ex: [['echo 01101000 01101001 | unbin', 'hi']], see: ['unhex'] },
     rot13: { d: 'the most secure encryption', syn: 'rot13 [text | file]' },
+    morse: { d: 'morse code, both ways', syn: ['morse text', 'morse -d [file]'], desc: 'encodes letters, digits and a little punctuation. -d decodes: letters are separated by spaces, words by /. when decoding a file, only the lines made of dots and dashes are read.', ex: [['morse sos', 'encode'], ['morse -d ... --- ...', 'decode']], see: ['rot13', 'base32'] },
     calc: { d: 'calculator with hex and binary', syn: 'calc expression', desc: 'understands + - * / % ^ **, parentheses, 0x hex, 0b binary, 0o octal, pi, e, sqrt() abs() log2() floor() ceil() round(). integers are also shown in hex and binary.', ex: [['calc 0x45e0 - 0x4525', 'distance between two offsets'], ['calc 17701 / 512', 'which sector is that?']], see: ['bc', 'factor'] },
     bc: { d: 'calculator that reads stdin', syn: 'echo expression | bc', see: ['calc'] },
     factor: { d: 'prime factors', syn: 'factor N', see: ['calc'] },
@@ -218,6 +219,9 @@
     'nvidia-smi': { d: 'gpu status', syn: 'nvidia-smi', see: ['htop'] },
     dmesg: { d: 'kernel messages', syn: 'dmesg', notes: 'dmesg shows when usb devices were attached and whether they came up write-protected. it is the first place to check that an evidence drive really is read-only.', see: ['lsusb', 'journalctl'] },
     journalctl: { d: 'system journal', syn: 'journalctl [-f]', see: ['dmesg', 'last'] },
+    curl: { d: 'fetch a url', syn: ['curl [-I] [-i] url', 'curl -o file url', 'curl -O url'], desc: 'the workstation is air-gapped. the one server it can always reach is itself, so `curl /robots.txt` and `curl https://' + LX_CONFIG.domains[0] + '/...` work and everything else does not resolve. -I shows only the response headers, -i adds them before the body, -o saves into a file (or ~/work when the folder is read-only), -O names the file after the url.',
+      ex: [['curl /robots.txt', 'what the site asks crawlers to skip'], ['curl -I /', 'just the headers (look at the security ones)']], notes: 'robots.txt is a request to polite crawlers, not access control. it is one of the first files anyone recon-ing a site reads.', see: ['wget'] },
+    wget: { d: 'download a url into a file', syn: 'wget [-O file] url', desc: 'like curl -O, with the classic progress chatter. same rule: only this server answers.', see: ['curl', 'unzip'] },
     ip: { d: 'network interfaces', syn: 'ip a', desc: 'only loopback is up. the workstation is air-gapped on purpose. also `ifconfig`.', see: ['ping'] },
     ping: { d: 'send icmp echo requests', syn: 'ping host', desc: 'only localhost answers. everything else: network unreachable.', see: ['ip'] },
     cal: { d: 'calendar', syn: 'cal' },

@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# keep crawlers out of the old drop server backup
+Disallow: /internal/backup-2025-08-01.zip

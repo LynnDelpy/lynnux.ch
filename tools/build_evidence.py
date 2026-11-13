@@ -13,7 +13,7 @@ the hash (see README, "how flags stay secret").
 
 needs: python3, pillow, numpy
 """
-import hashlib, io, json, math, os, random, re, secrets, struct, sys, zipfile, zlib
+import base64, hashlib, io, json, math, os, random, re, secrets, struct, sys, zipfile, zlib
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -40,6 +40,10 @@ FLAG_BODIES = {
     '005': 'deleted_is_not_gone_%s',
     '006': 'look_at_the_sound_%s',
     '007': 'z3r0_w1dth_but_n0t_z3r0_1nf0_%s',
+    '008': 'kn0wn_pl41nt3xt_br34ks_x0r_%s',
+    '009': 'r3v3rs3d_th3_ch3ck_%s',
+    '010': 'r0b0ts_txt_t3lls_4ll_%s',
+    '011': 'p33l3d_th3_0n10n_%s',
 }
 HEX_SAFE = '23456789abcdef'  # no 0/1, so visual flags stay readable
 # assume the attacker has this file and js/evidence.gen.js (the repo is public).
@@ -582,6 +586,96 @@ def zero_width(flag):
     return ''.join('​' if c == '0' else '‌' for c in bits)
 
 
+# ---------------------------------------------------------------- 008 crypto: repeating-key xor
+def case_008(flag):
+    # every message from this channel starts with the flag, so the first bytes are known
+    # plaintext: cipher ^ "lynnux{" gives the key. the key is picked from the flag, so a
+    # rebuild with the same flags gives the same bytes
+    key = random.Random(flag).choice([b'aare!', b'mate42', b'bern05', b'lx47!', b'fondue'])
+    msg = (flag + '\n'
+           'drop moved to the 3rd bench, aare side. same time.\n'
+           'this channel is military grade xor. nobody can read it. -47\n').encode()
+    data = bytes(c ^ key[i % len(key)] for i, c in enumerate(msg))
+    assert flag.encode() not in data
+    write(os.path.join(EVID, 'case-008', 'intercept.bin'), data)
+
+
+# ---------------------------------------------------------------- 009 rev: a license check
+def case_009(flag):
+    # the check never undoes anything, it mangles the input and compares. so the
+    # answer is SECRET with the mangling undone, in reverse order
+    k = len('suspect_47') * 4 + 2   # 42, the script makes you count
+    secret = base64.b64encode(bytes(c ^ k for c in flag.encode())[::-1]).decode()
+    src = '\n'.join([
+        '#!/usr/bin/env python3',
+        '# license_check.py: recovered from ~/.local/bin on the seized laptop.',
+        '# suspect_47 called this "uncrackable". it guards their exfil tool.',
+        'import base64',
+        '',
+        'KEY = len("suspect_47") * 4 + 2',
+        'SECRET = "%s"' % secret,
+        '',
+        '',
+        'def mangle(key: str) -> str:',
+        '    b = key.encode()',
+        '    b = bytes(c ^ KEY for c in b)        # 1. xor every byte',
+        '    b = b[::-1]                          # 2. reverse',
+        '    return base64.b64encode(b).decode()  # 3. base64',
+        '',
+        '',
+        'if __name__ == "__main__":',
+        '    key = input("license key: ").strip()',
+        '    print("valid. welcome back, 47." if mangle(key) == SECRET else "invalid license.")',
+        ''])
+    assert flag not in src
+    write(os.path.join(EVID, 'case-009', 'license_check.py'), src.encode())
+
+
+# ---------------------------------------------------------------- 010 web: robots.txt
+def case_010(flag):
+    # no evidence file: the "drop server" is the site itself. robots.txt asks crawlers
+    # to skip a backup, which is exactly where a person looks first
+    robots = ('User-agent: *\n'
+              'Allow: /\n'
+              '\n'
+              '# keep crawlers out of the old drop server backup\n'
+              'Disallow: /internal/backup-2025-08-01.zip\n')
+    write(os.path.join(ROOT, 'robots.txt'), robots.encode())
+    env = ('# drop server config, backed up before the move. DO NOT PUBLISH\n'
+           'APP_ENV=production\n'
+           'DB_HOST=127.0.0.1\n'
+           'DB_USER=drop\n'
+           'DB_PASS=Sommer2025!\n'
+           'ADMIN_TOKEN=%s\n' % base64.b64encode(flag.encode()).decode())
+    notes = ('moving the drop server. backup is in internal/, robots.txt keeps\n'
+             'google out of it, so nobody will ever find it. -47\n')
+    bio = io.BytesIO()
+    with zipfile.ZipFile(bio, 'w', zipfile.ZIP_DEFLATED) as z:
+        for name, body in (('.env', env), ('notes.txt', notes)):
+            z.writestr(zipfile.ZipInfo(name, date_time=(2025, 8, 1, 3, 14, 7)), body, zipfile.ZIP_DEFLATED)
+    data = bio.getvalue()
+    assert flag.encode() not in data
+    write(os.path.join(ROOT, 'internal', 'backup-2025-08-01.zip'), data)
+
+
+# ---------------------------------------------------------------- 011 misc: an encoding onion
+MORSE = {**dict(zip('ABCDEFGHIJKLMNOPQRSTUVWXYZ', '.- -... -.-. -.. . ..-. --. .... .. .--- -.- .-.. -- -. --- .--. --.- .-. ... - ..- ...- .-- -..- -.-- --..'.split())),
+         **dict(zip('0123456789', '----- .---- ..--- ...-- ....- ..... -.... --... ---.. ----.'.split())), '=': '-...-'}
+
+
+def case_011(flag):
+    # outside in: morse, base32, reversed, hex, base64, rot13. every layer has a tell
+    rot13 = flag.translate(str.maketrans('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                                         'nopqrstuvwxyzabcdefghijklmNOPQRSTUVWXYZABCDEFGHIJKLM'))
+    layer = base64.b64encode(rot13.encode()).hex()[::-1]
+    b32 = base64.b32encode(layer.encode()).decode()
+    morse = ' '.join(MORSE[c] for c in b32)
+    body = ('intercepted on the suspect\'s ham radio, 14.074 MHz, 03:12 utc.\n'
+            'the operator kept saying "layers". it is one long line:\n\n' + morse + '\n')
+    assert flag not in body and rot13 not in body
+    write(os.path.join(EVID, 'case-011', 'onion.txt'), body.encode())
+
+
 # ---------------------------------------------------------------- manifest
 def main():
     flags, changed = load_flags(new='--new' in sys.argv)
@@ -592,6 +686,10 @@ def main():
     case_004(flags['004'])
     case_005(flags['005'])
     case_006(flags['006'])
+    case_008(flags['008'])
+    case_009(flags['009'])
+    case_010(flags['010'])
+    case_011(flags['011'])
 
     files = {}
     for case in sorted(os.listdir(EVID)):

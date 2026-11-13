@@ -5,16 +5,20 @@ var LX_EVIDENCE={
   "name": "PBKDF2",
   "hash": "SHA-256",
   "iterations": 600000,
-  "salt": "0172f2531ae6b3a3b545cca052d23276"
+  "salt": "fd7b41a5a4b471cc8113052a10a3e682"
  },
  "hashes": {
-  "001": "c7ea305b698d7f1e27cc37455ad6f2c477e430346fe8caff5de8ae46ef1bf3fe",
-  "002": "4cb35a4304788aa490b4ad5e20bd2600ad6393480fb6e5964364cc3f0f4443a5",
-  "003": "0718fd90a3e4aa0a43d893c8caaef44f4f259afaf73122e46f649640bfe54d35",
-  "004": "c12db6d40a63bda5487a28bd0ceac80e14e9de07fc06bff4094b512fbb13d7ce",
-  "005": "3a7e0b626d8d9bd0190f20f5605e6434e6f313469dafffe0c20a2a94891c65e2",
-  "006": "60ff6dec47f61577896cb32c1fa5f21f0ad36d334f905243bd06546f73680844",
-  "007": "de2858a5d2373983a8a3aab67898eceb2b70069fa4e7b2bb0a49949d3d966262"
+  "001": "dd40491987161389d73260501167200dd2d986f0ad17d98e45130ad635ea041a",
+  "002": "652ca119311e40d23ceeac9b4d09a016c8fd289edb54de3de00226ba34c0a227",
+  "003": "ee3f869db844840ea170b1bf9d70d15bc19458ab764902f910f9fe8db110f846",
+  "004": "711d7cef45516cbafded4f0a6234a58e505032902353721d08a4a1343e0dac33",
+  "005": "2c09cb114207c0edea7af73ae6a4b7049e282e6b75ecc7873266cf0bfa921b21",
+  "006": "8fc6c755c7917bd87e5915b0c966a76a4a0bab0e09e6a4599a003af1212fcfd5",
+  "007": "5c75ab08f9d0c9a4b4dce2a47efa582a3873fe23a83ae557516693d928dd229b",
+  "008": "959c66e2eed35d272707ec07de311876e03b91625a4842bef5b87762641a36eb",
+  "009": "642c344a948ed009f5f0fb1041aa648ed29c249ef14b80975058472926198a7d",
+  "010": "e9139ad44894438c73bcbe1da2ec9c5ca637aca6cf4596b42bd7ac51101a7684",
+  "011": "868376df55abf12d22a7cde5d40739db65a737f7952ca73d541013f56d63f92b"
  },
  "files": {
   "001": [
@@ -69,6 +73,33 @@ var LX_EVIDENCE={
     "size": 425078,
     "md5": "25b7638d9e076547f4ca75933947acc0",
     "sha256": "9065cc16ad3f574bcdf9cff0d14493b2993cd7912192a24679184c4ae970036d"
+   }
+  ],
+  "008": [
+   {
+    "name": "intercept.bin",
+    "path": "evidence/case-008/intercept.bin",
+    "size": 157,
+    "md5": "b9614a1cd0954b1b525b9a7118b58c28",
+    "sha256": "121754333a92523363668b78f0d622fc34c4b0ba96c4fa67c2ccbcb881789163"
+   }
+  ],
+  "009": [
+   {
+    "name": "license_check.py",
+    "path": "evidence/case-009/license_check.py",
+    "size": 649,
+    "md5": "18e7345299ae457a183613b0515d59ab",
+    "sha256": "048e94ca32a27fc034ae15378989204ebb9a82608d58bd4380a442591a6260eb"
+   }
+  ],
+  "011": [
+   {
+    "name": "onion.txt",
+    "path": "evidence/case-011/onion.txt",
+    "size": 780,
+    "md5": "37cdf198f6f3719fa1d317a1efc95a7d",
+    "sha256": "0b888bf805441fd430c9f5ef2595610f76c0ae74a4153b8ee1fcb480c6d4647e"
    }
   ]
  },

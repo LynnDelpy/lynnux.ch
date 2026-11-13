@@ -607,7 +607,110 @@
     for (var i = 1; i <= 4; i++) { await ctx.sleep(380); ctx.out.text('64 bytes from 127.0.0.1: icmp_seq=' + i + ' ttl=64 time=0.0' + (31 + i * 7 % 40) + ' ms'); }
     ctx.out.text('\n--- ' + h + ' ping statistics ---\n4 packets transmitted, 4 received, 0% packet loss, time 3004ms');
   });
-  ['curl', 'wget', 'ssh', 'scp', 'nc', 'ncat', 'telnet', 'dig', 'nslookup', 'host', 'traceroute', 'nmap', 'whois', 'ftp', 'rsync'].forEach(function (n) {
+  // curl and wget: the box is air-gapped, except for the one server it can always reach, itself.
+  // that makes the web case work in here, and the same commands work against the real site
+  function selfPath(u) {
+    var m = /^(?:https?:\/\/)?([^\/?#]*)(.*)$/i.exec(u || '');
+    var host = m[1].replace(/:\d+$/, '').toLowerCase(), path = m[2] || '/';
+    if (/^\//.test(u)) { host = ''; path = u; }
+    var self = ['', 'localhost', '127.0.0.1', LX.HOST, LX_CONFIG.siteName].concat(LX_CONFIG.domains);
+    var ok = self.indexOf(host) >= 0 || LX_CONFIG.domains.some(function (d) { return host.slice(-(d.length + 1)) === '.' + d; });
+    if (!ok) return { host: host };
+    return { host: host || LX.HOST, path: path[0] === '/' ? path : '/' + path };
+  }
+  function isText(type) { return /^text\/|json|javascript|xml|svg/.test(type || ''); }
+  function saveAs(ctx, name, data) {
+    var abs = LX.fs.norm(name), dir = abs.slice(0, abs.lastIndexOf('/')) || '/';
+    return LX.fs.writable(dir) && LX.fs.get(dir) ? LX.fs.put(abs, { t: 'b', data: data }) : LX.save(ctx, abs.slice(abs.lastIndexOf('/') + 1), data);
+  }
+  async function getSelf(ctx, cmd, url) {
+    var t = selfPath(url);
+    if (!t.path) {
+      ctx.out.err(cmd === 'curl' ? 'curl: (6) Could not resolve host: ' + (t.host || url) : 'wget: unable to resolve host address ‘' + (t.host || url) + '’');
+      ctx.out.text('(air-gapped. the only server this box can reach is itself: ' + LX.HOST + ')', 'c-dim');
+      return null;
+    }
+    var r = await fetch(t.path, { cache: 'no-store', signal: ctx.signal });
+    return { r: r, t: t, data: new Uint8Array(await r.arrayBuffer()) };
+  }
+  def('curl', { cat: 'netdisk', help: 'fetch a url. only this server answers', usage: 'curl [-I] [-i] [-o file] <url>' }, async function (ctx) {
+    var a = ctx.args.slice(), url = null, out = null, head = false, incl = false, fail = false, remote = false;
+    for (var i = 0; i < a.length; i++) {
+      var x = a[i];
+      if (x === '-o' || x === '--output') out = a[++i];
+      else if (x === '-O' || x === '--remote-name') remote = true;
+      else if (x === '-I' || x === '--head') head = true;
+      else if (x === '-i' || x === '--include') incl = true;
+      else if (x === '-f' || x === '--fail') fail = true;
+      else if (/^-[XAHde]$/.test(x)) i++;
+      else if (x[0] === '-') { if (!/^-[sSLvk]+$/.test(x) && !/^--(silent|location|verbose|insecure)$/.test(x)) return ctx.out.err('curl: option ' + x + ': is unknown'); }
+      else url = x;
+    }
+    if (!url) { ctx.out.err('curl: no URL specified!'); ctx.out.text("curl: try 'curl --help' or 'man curl' for more information", 'c-dim'); return 2; }
+    var g = await getSelf(ctx, 'curl', url);
+    if (!g) return 6;
+    var hdr = 'HTTP/2 ' + g.r.status + '\n' + Array.from(g.r.headers.entries()).map(function (h) { return h[0] + ': ' + h[1]; }).join('\n') + '\n';
+    if (head) return ctx.out.text(hdr);
+    if (fail && !g.r.ok) { ctx.out.err('curl: (22) The requested URL returned error: ' + g.r.status); return 22; }
+    if (remote) out = g.t.path.split('?')[0].split('/').pop() || 'index.html';
+    if (out && out !== '-') { saveAs(ctx, out, g.data); return; }
+    if (incl) ctx.out.text(hdr);
+    if (isText(g.r.headers.get('content-type')) || out === '-' || ctx.piped) return ctx.out.bytes(g.data, 'curl ' + url);
+    ctx.out.err('Warning: Binary output can mess up your terminal. Use "--output -" to tell curl to output it to your terminal anyway, or consider "--output <FILE>" to save to a file.');
+    return 23;
+  });
+  def('wget', { cat: 'netdisk', help: 'download a url into a file. only this server answers', usage: 'wget [-O file] <url>' }, async function (ctx) {
+    var a = ctx.args.slice(), url = null, out = null, quiet = false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] === '-O' || a[i] === '--output-document') out = a[++i];
+      else if (a[i] === '-q' || a[i] === '--quiet') quiet = true;
+      else if (a[i][0] !== '-') url = a[i];
+    }
+    if (!url) return ctx.out.err('wget: missing URL');
+    var g = await getSelf(ctx, 'wget', url);
+    if (!g) return 4;
+    var full = 'https://' + g.t.host + g.t.path, name = out || g.t.path.split('?')[0].split('/').pop() || 'index.html';
+    if (!quiet) {
+      ctx.out.text('--' + new Date().toISOString().replace('T', ' ').slice(0, 19) + '--  ' + full);
+      ctx.out.text('Connecting to ' + g.t.host + ' (' + g.t.host + ')|127.0.0.1|:443... connected.');
+      ctx.out.text('HTTP request sent, awaiting response... ' + g.r.status + ' ' + (g.r.statusText || (g.r.ok ? 'OK' : 'Not Found')));
+    }
+    if (!g.r.ok) { ctx.out.err(new Date().toISOString().slice(0, 10) + ' ERROR ' + g.r.status + '.'); return 8; }
+    if (out === '-') return ctx.out.bytes(g.data, 'wget ' + url);
+    var saved = saveAs(ctx, name, g.data);
+    if (!quiet) ctx.out.text('Length: ' + g.data.length + ' [' + (g.r.headers.get('content-type') || 'application/octet-stream') + ']\nSaving to: ‘' + LX.fs.display(saved) + '’\n\n‘' + LX.fs.display(saved) + '’ saved [' + g.data.length + '/' + g.data.length + ']');
+  });
+
+  // morse, both ways. decoding only reads lines made of dots and dashes, so `morse -d file` skips the prose
+  var MORSE = {};
+  'A.- B-... C-.-. D-.. E. F..-. G--. H.... I.. J.--- K-.- L.-.. M-- N-. O--- P.--. Q--.- R.-. S... T- U..- V...- W.-- X-..- Y-.-- Z--.. 0----- 1.---- 2..--- 3...-- 4....- 5..... 6-.... 7--... 8---.. 9----. =-...- ..-.-.- ,--..-- ?..--.. /-..-. --....- (-.--. )-.--.-'
+    .split(' ').forEach(function (p) { MORSE[p[0]] = p.slice(1); });
+  var UNMORSE = {};
+  Object.keys(MORSE).forEach(function (k) { UNMORSE[MORSE[k]] = k; });
+  def('morse', { cat: 'text', help: 'morse code, both ways (-d decodes)', usage: 'morse [-d] [text|file]' }, async function (ctx) {
+    var o = LX.opts(ctx.args, { flags: 'd' }), s = await LX.readLoose(ctx, o.rest, 'morse');
+    if (s === null) return;
+    var code = s.split('\n').filter(function (l) { return /^[.\-\/\s]+$/.test(l) && /[.\-]/.test(l); });
+    if (o.f.d || (code.length && !/[a-z0-9]/i.test(s))) {
+      if (!code.length) return ctx.out.err('morse: no dots and dashes to decode');
+      return ctx.out.text(code.map(function (l) {
+        return l.trim().split(/\s*\/\s*/).map(function (w) { return w.split(/\s+/).map(function (t) { return UNMORSE[t] || '?'; }).join(''); }).join(' ');
+      }).join('\n'));
+    }
+    ctx.out.text(s.replace(/\n$/, '').toUpperCase().split('\n').map(function (l) {
+      return l.split(/\s+/).map(function (w) { return w.split('').map(function (c) { return MORSE[c] || ''; }).filter(Boolean).join(' '); }).join(' / ');
+    }).join('\n'));
+  });
+
+  // case-009 is a python script, so people will try. there is no python on an evidence box
+  def('python3', { cat: 'system', hidden: true }, function (ctx) {
+    ctx.out.err('zsh: command not found: ' + ctx.name);
+    ctx.out.text('(no interpreters on a forensic workstation: running suspect code on the evidence box is how you lose evidence. read it instead, or download it and run it on your own machine.)', 'c-dim');
+    return 127;
+  });
+  LX.cmds.python = LX.cmds.python3;
+
+  ['ssh', 'scp', 'nc', 'ncat', 'telnet', 'dig', 'nslookup', 'host', 'traceroute', 'nmap', 'whois', 'ftp', 'rsync'].forEach(function (n) {
     def(n, { cat: 'system', hidden: true }, function (ctx) {
       ctx.out.err(n + ': network is unreachable');
       ctx.out.text('(this is a forensic workstation. it is air-gapped. evidence goes in, nothing goes out.)', 'c-dim');

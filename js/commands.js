@@ -357,14 +357,20 @@
     return async function (ctx) {
       var a = ctx.args.map(function (x) { return /^-\d+$/.test(x) ? '-n' + x.slice(1) : x; });
       var o = LX.opts(a, { vals: 'nc' }), n = LX.num(o.v.n, 10);
+      if (o.v.c !== undefined) { // bytes, not lines: head -c 7 cipher.bin | xor ...
+        var r = await LX.readBytes(ctx, o.rest[0], ctx.name);
+        if (!r) return;
+        var c = Math.max(0, LX.num(o.v.c, 0));
+        return ctx.out.bytes(isHead ? r.bytes.slice(0, c) : r.bytes.slice(Math.max(0, r.bytes.length - c)), ctx.name + ' -c ' + c + ' ' + (o.rest[0] || ''));
+      }
       var s = await LX.readInput(ctx, o.rest[0], ctx.name);
       if (s === null) return;
       var lines = s.replace(/\n$/, '').split('\n');
       ctx.out.text((isHead ? lines.slice(0, n) : lines.slice(-n)).join('\n'));
     };
   }
-  def('head', { cat: 'text', help: 'first lines', usage: 'head [-n N] [file]' }, headTail(true));
-  def('tail', { cat: 'text', help: 'last lines', usage: 'tail [-n N] [file]' }, headTail(false));
+  def('head', { cat: 'text', help: 'first lines (or bytes, with -c)', usage: 'head [-n N | -c N] [file]' }, headTail(true));
+  def('tail', { cat: 'text', help: 'last lines (or bytes, with -c)', usage: 'tail [-n N | -c N] [file]' }, headTail(false));
   def('wc', { cat: 'text', help: 'count lines, words, bytes', usage: 'wc [-lwc] [file]' }, async function (ctx) {
     var o = LX.opts(ctx.args, { flags: 'lwcm' });
     var s = await LX.readInput(ctx, o.rest[0], 'wc');

@@ -151,11 +151,14 @@
     out.text('');
     out.html('welcome, ' + span('c-amber', name) + '. this is ' + span('c-amber', LX.HOST) + ', a forensic workstation.' + span('c-dim', '  ' + LX_CONFIG.tagline + ' · ' + LX_CONFIG.location));
     out.text('');
-    [['cases', 'real forensics challenges, solvable right here'], ['about', 'who runs this machine'], ['contact', 'links + how to reach me'], ['help', 'every command (there are a lot)']].forEach(function (r) {
-      out.html('  ' + span('c-amber', '▸ ') + LX.cmdLink(r[0], LX.pad(r[0], 10), 'c-cyan') + span('c-dim', r[1]));
-    });
+    // a grid, so the descriptions wrap in their own column on a phone instead of under the commands
+    out.html('<div class="menu">' + [['cases', 'challenges: forensics, crypto, rev, web, misc. solvable right here'], ['gui', 'the plain view: everything on one page, no typing'],
+      ['about', 'who runs this machine'], ['contact', 'links + how to reach me'], ['help', 'every command (there are a lot)']].map(function (r) {
+      return '<span class="mi">' + span('c-amber', '▸ ') + LX.cmdLink(r[0], r[0], 'c-cyan') + '</span>' + span('md c-dim', r[1]);
+    }).join('') + '</div>');
     out.text('');
-    out.html(span('c-dim', 'everything underlined on hover is clickable. tab completes. pipes work. the evidence is real.'));
+    if (LX.touch()) out.html(span('c-dim', 'on a phone? tap anything underlined, or open ') + LX.cmdLink('gui', 'the plain view', 'c-amber') + span('c-dim', ', it is easier than typing.'));
+    else out.html(span('c-dim', 'everything underlined on hover is clickable. tab completes. pipes work. the evidence is real.'));
     var n = LX.cases.solvedCount();
     if (n) out.html(span('c-dim', 'welcome back. ') + span('c-green', n + '/' + LX.cases.total() + ' cases closed') + span('c-dim', ' so far.'));
     // closed everything before promotions existed: you are owed one
